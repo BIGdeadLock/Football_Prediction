@@ -62,7 +62,7 @@ class FootballPreprocessesor(object):
                                             LEFT JOIN Team AS HT on HT.team_api_id = Match.home_team_api_id
                                             LEFT JOIN Team AS AT on AT.team_api_id = Match.away_team_api_id                          
                                             ORDER by date
-
+                                            LIMIT 10000
                                             ;""", self._database_connection)
         data1 = data[["home_team", "away_team", "season", "home_team_goal", "away_team_goal"]]
 
@@ -111,6 +111,7 @@ class FootballPreprocessesor(object):
                                        away_player_9 IS NOT NULL AND
                                        away_player_10 IS NOT NULL AND
                                        away_player_11 IS NOT NULL 
+                                       LIMIT 10000
                                        """, self._database_connection)  # TODO: Remove the limit
 
     def __unique_value_exctraction(self, df: pd.DataFrame, columns: list) -> set:
@@ -271,8 +272,6 @@ class FootballPreprocessesor(object):
         new_df = pd.DataFrame()
 
         for label, row in self._dataset.iterrows():
-
-
             away_team ,home_team = row.at['HomeTeamAPI'], row.at['AwayTeamAPI']
             #  Get all the matches of the away_team and the home_team
             match = self._match_data.loc[(self._match_data['home_team_api_id'] == home_team) & (self._match_data['away_team_api_id'] == away_team)]
@@ -288,9 +287,7 @@ class FootballPreprocessesor(object):
                 home_or_away_bets_odds = betting_ods.loc[:, self._bets_columns[bet]]
                 #  For each match calculate the mean of all betting ods and that will be the match bet odd.
                 betting_odd = home_or_away_bets_odds.fillna(0).values.mean()
-                if not betting_odd: # TODO: Show guy
-                    print("a")
-                    continue
+
                 row[column] = betting_odd
 
             #  Create a new dataframe with the new Odss feature
