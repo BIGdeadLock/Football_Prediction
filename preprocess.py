@@ -24,6 +24,8 @@ class FootballPreprocesses(object):
 
         :return: DataFrame object containing the preprocessed dataset
         """
+        self.__clear_null_from_match()
+        self.__shrink_match_data_dimension()
         # self.__add_team_rankings()
         # self.__add_team_stats()
         # self.__add_classification()
@@ -36,25 +38,31 @@ class FootballPreprocesses(object):
         """
         The method will be responsible for loading the data from the database.
         """
-        data = pd.read_sql("""SELECT Match.id, Match.home_team_api_id, Match.away_team_api_id,
-                                                Country.name AS country_name, 
-                                                League.name AS league_name, 
-                                                season, 
-                                                stage, 
-                                                date,
-                                                HT.team_long_name AS  home_team,
-                                                AT.team_long_name AS away_team,
-                                                home_team_goal, 
-                                                away_team_goal                                        
-                                        FROM Match
-                                        JOIN Country on Country.id = Match.country_id
-                                        JOIN League on League.id = Match.league_id
-                                        LEFT JOIN Team AS HT on HT.team_api_id = Match.home_team_api_id
-                                        LEFT JOIN Team AS AT on AT.team_api_id = Match.away_team_api_id                          
-                                        ORDER by date
-                                       LIMIT 5000
+        self.__load_match_table()
+        self.__load_team_attr_table()
+        self.__load_player_attr_table()
+        self.__create_init_dataset()
 
-                                        ;""", self._database_connection)
+    def __create_init_dataset(self):
+        data = pd.read_sql("""SELECT Match.id, Match.home_team_api_id, Match.away_team_api_id,
+                                                    Country.name AS country_name, 
+                                                    League.name AS league_name, 
+                                                    season, 
+                                                    stage, 
+                                                    date,
+                                                    HT.team_long_name AS  home_team,
+                                                    AT.team_long_name AS away_team,
+                                                    home_team_goal, 
+                                                    away_team_goal                                        
+                                            FROM Match
+                                            JOIN Country on Country.id = Match.country_id
+                                            JOIN League on League.id = Match.league_id
+                                            LEFT JOIN Team AS HT on HT.team_api_id = Match.home_team_api_id
+                                            LEFT JOIN Team AS AT on AT.team_api_id = Match.away_team_api_id                          
+                                            ORDER by date
+                                           LIMIT 5000
+
+                                            ;""", self._database_connection)
         data1 = data[["home_team", "away_team", "season", "home_team_goal", "away_team_goal"]]
 
         self._dataset = pd.DataFrame(
@@ -63,47 +71,61 @@ class FootballPreprocesses(object):
              "AwayTeam": data1.away_team + data1.season, "HomeTeamGaols": data1.home_team_goal,
              "AwayTeamGaols": data1.away_team_goal})
 
-        # Player Attributes Table with only the unique player_api_id feature and the overall_rating feature
+    def __load_player_attr_table(self):
         self._player_attributes_data = pd.read_sql_query("""SELECT DISTINCT player_api_id, overall_rating 
-                                                 FROM Player_Attributes
-                                                 GROUP BY player_api_id                         
-                                                 """, self._database_connection)
+                                                       FROM Player_Attributes
+                                                       GROUP BY player_api_id                         
+                                                       """, self._database_connection)
         # set the index to be the player_api_id field
         self._player_attributes_data.set_index('player_api_id', inplace=True, drop=True)
 
-        # Matches Table
-        self._match_data = pd.read_sql("""SELECT *
-                               FROM Match
-                               WHERE home_player_1 IS NOT NULL AND 
-                               home_player_2 IS NOT NULL AND 
-                               home_player_3 IS NOT NULL AND 
-                               home_player_4 IS NOT NULL AND
-                               home_player_5 IS NOT NULL AND
-                               home_player_6 IS NOT NULL AND
-                               home_player_7 IS NOT NULL AND
-                               home_player_8 IS NOT NULL AND
-                               home_player_9 IS NOT NULL AND
-                               home_player_10 IS NOT NULL AND
-                               home_player_11 IS NOT NULL AND
-                               away_player_1 IS NOT NULL  AND
-                               away_player_2 IS NOT NULL AND
-                               away_player_3 IS NOT NULL AND
-                               away_player_4 IS NOT NULL AND
-                               away_player_5 IS NOT NULL AND
-                               away_player_6 IS NOT NULL AND
-                               away_player_7 IS NOT NULL AND
-                               away_player_8 IS NOT NULL AND
-                               away_player_9 IS NOT NULL AND
-                               away_player_10 IS NOT NULL AND
-                               away_player_11 IS NOT NULL
-                               LIMIT 5000
-                               """, self._database_connection)  # TODO: Remove the limit
-
-        # Team Attributes Table
+    def __load_team_attr_table(self):
         self._team_attributes_data = pd.read_sql("""SELECT team_api_id, buildUpPlaySpeed, chanceCreationShooting, defencePressure  
-                                         FROM Team_Attributes
-                                         GROUP BY team_api_id
-                                         """, self._database_connection)
+                                                FROM Team_Attributes
+                                                GROUP BY team_api_id
+                                                """, self._database_connection)
+
+    def __load_match_table(self):
+        self._match_data = pd.read_sql("""SELECT *
+                                       FROM Match
+                                       WHERE home_player_1 IS NOT NULL AND 
+                                       home_player_2 IS NOT NULL AND 
+                                       home_player_3 IS NOT NULL AND 
+                                       home_player_4 IS NOT NULL AND
+                                       home_player_5 IS NOT NULL AND
+                                       home_player_6 IS NOT NULL AND
+                                       home_player_7 IS NOT NULL AND
+                                       home_player_8 IS NOT NULL AND
+                                       home_player_9 IS NOT NULL AND
+                                       home_player_10 IS NOT NULL AND
+                                       home_player_11 IS NOT NULL AND
+                                       away_player_1 IS NOT NULL  AND
+                                       away_player_2 IS NOT NULL AND
+                                       away_player_3 IS NOT NULL AND
+                                       away_player_4 IS NOT NULL AND
+                                       away_player_5 IS NOT NULL AND
+                                       away_player_6 IS NOT NULL AND
+                                       away_player_7 IS NOT NULL AND
+                                       away_player_8 IS NOT NULL AND
+                                       away_player_9 IS NOT NULL AND
+                                       away_player_10 IS NOT NULL AND
+                                       away_player_11 IS NOT NULL 
+                                       LIMIT 5000
+                                       """, self._database_connection)  # TODO: Remove the limit
+
+    def __clear_null_from_match(self):
+        cols = self._match_data.loc[:,"B365H", "BSA"]
+        self.bets_columns = [c for c in cols]
+        #  Drop an match observation if all the bets columns have nulls
+        self._dataset.dropna(axis=0, subset=self.bets_columns, how="all")
+
+    def __shrink_match_data_dimension(self):
+        home_player_X_positions = [f"home_player_X{i}" for i in range(1,12)]
+        home_player_Y_positions = [f"home_player_Y{i}" for i in range(1,12)]
+        away_player_X_positions = [f"away_player_X{i}" for i in range(1,12)]
+        away_player_Y_positions = [f"away_player_Y{i}" for i in range(1,12)]
+        for col in [home_player_X_positions, home_player_Y_positions, away_player_X_positions, away_player_Y_positions]:
+            self._dataset.drop(col, axis=1, inplace=True)
 
     def __add_team_rankings(self):
         """
