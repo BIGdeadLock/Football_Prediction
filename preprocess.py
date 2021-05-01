@@ -7,7 +7,7 @@ import sqlite3  # SQLite
 import xml.etree.ElementTree as ET
 
 
-class Preprocesses(object):
+class FootballPreprocesses(object):
 
     def __init__(self, database_path):
 
@@ -265,7 +265,7 @@ class Preprocesses(object):
         self._dataset = self._dataset[self._dataset.index != row_index]
 
 
-p = Preprocesses("database.sqlite")
+p = FootballPreprocesses("database.sqlite")
 data = p.preprocess()
 x = p._match_data
 #
