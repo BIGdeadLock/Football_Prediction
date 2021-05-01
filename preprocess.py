@@ -26,8 +26,8 @@ class FootballPreprocesses(object):
         """
         self.__clear_null_from_match()
         self.__shrink_match_data_dimension()
-        # self.__add_team_rankings()
-        # self.__add_team_stats()
+        self.__add_team_rankings()
+        self.__add_team_stats()
         # self.__add_classification()
         self.__add_bets_ods_features()
         self._database_connection.close()
@@ -113,6 +113,20 @@ class FootballPreprocesses(object):
                                        LIMIT 5000
                                        """, self._database_connection)  # TODO: Remove the limit
 
+    def __unique_value_exctraction(self, df: pd.DataFrame, columns: list) -> list:
+        """
+        The method will be used to extract unique values of each column set in the columns param.
+        :param dataframe: DataFrame - the data which the columns belongs to
+        :param columns: list of columns to which we need to extract unique values.
+        :return: list of unique values
+        """
+        unique_values = []
+        for col in columns:
+            values = df.drop_duplicates(col)[col].tolist()
+            unique_values += values
+
+        return unique_values
+
     def __clear_null_from_match(self):
         """
         The method will be responsible for deleting nulls from the match data based on rules.
@@ -151,9 +165,6 @@ class FootballPreprocesses(object):
         """
         home_team_ids = self._dataset['HomeTeamAPI'].drop_duplicates().dropna().tolist()
         away_team_ids = self._dataset['AwayTeamAPI'].drop_duplicates().dropna().tolist()
-
-        home_players_features = [f"home_player_{feat}" for feat in range(1, 11)]
-        away_players_features = [f"away_player_{feat}" for feat in range(1, 11)]
         teams_players = {}
 
         for home_team in home_team_ids:
@@ -162,11 +173,15 @@ class FootballPreprocesses(object):
                 self._match_data['home_team_api_id'] == home_team]  # Get the dataframe of each home team
             home_team_lineup = df.loc[:,
                                'home_player_1':'home_player_11']  # Get the lineup of players id of the home team
-            home_team_lineup.drop_duplicates(subset=home_players_features, keep=False, inplace=True)
+
+            if home_team_lineup.shape[0] == 0: # If loc result were 0 continue
+                continue
+
             for column in home_team_lineup.columns:
                 #  Remove duplicates for each player_X feature
                 players = home_team_lineup.drop_duplicates(column)[column].tolist()
                 teams_players[home_team] += players
+            x = self.__unique_value_exctraction(home_team_lineup, list(home_team_lineup.columns))
 
             # Remove duplicates where player 1 was player 2 for example
             teams_players[home_team] = set(teams_players[home_team])
@@ -177,7 +192,10 @@ class FootballPreprocesses(object):
                 self._match_data['away_team_api_id'] == away_team]  # Get the dataframe of each home team
             away_team_lineup = df.loc[:,
                                'away_player_1':'away_player_11']  # Get the lineup of players id of the home team
-            away_team_lineup.drop_duplicates(subset=away_players_features, keep=False, inplace=True)
+
+            if away_team_lineup.shape[0] == 0:  # If loc result were 0 continue
+                continue
+
             for column in away_team_lineup.columns:
                 #  Remove duplicates for each player_X feature
                 players = away_team_lineup.drop_duplicates(column)[column].tolist()
