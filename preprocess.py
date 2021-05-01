@@ -7,8 +7,10 @@ import sqlite3  # SQLite
 import xml.etree.ElementTree as ET
 
 
-class FootballPreprocesses(object):
-
+class FootballPreprocessesor(object):
+    """
+    The object that will wrap all the football data cleaning and manipulation functionalities.
+    """
     def __init__(self, database_path):
 
         self._database_connection = sqlite3.connect(database_path)
@@ -28,8 +30,8 @@ class FootballPreprocesses(object):
         self.__shrink_match_data_dimension()
         self.__add_team_rankings()
         self.__add_team_stats()
-        # self.__add_classification()
         self.__add_bets_ods_features()
+        # self.__add_classification()
         self._database_connection.close()
 
         return self._dataset
@@ -60,7 +62,6 @@ class FootballPreprocesses(object):
                                             LEFT JOIN Team AS HT on HT.team_api_id = Match.home_team_api_id
                                             LEFT JOIN Team AS AT on AT.team_api_id = Match.away_team_api_id                          
                                             ORDER by date
-                                           LIMIT 5000
 
                                             ;""", self._database_connection)
         data1 = data[["home_team", "away_team", "season", "home_team_goal", "away_team_goal"]]
@@ -110,10 +111,9 @@ class FootballPreprocesses(object):
                                        away_player_9 IS NOT NULL AND
                                        away_player_10 IS NOT NULL AND
                                        away_player_11 IS NOT NULL 
-                                       LIMIT 5000
                                        """, self._database_connection)  # TODO: Remove the limit
 
-    def __unique_value_exctraction(self, df: pd.DataFrame, columns: list) -> list:
+    def __unique_value_exctraction(self, df: pd.DataFrame, columns: list) -> set:
         """
         The method will be used to extract unique values of each column set in the columns param.
         :param dataframe: DataFrame - the data which the columns belongs to
@@ -125,7 +125,7 @@ class FootballPreprocesses(object):
             values = df.drop_duplicates(col)[col].tolist()
             unique_values += values
 
-        return unique_values
+        return set(unique_values)
 
     def __clear_null_from_match(self):
         """
@@ -167,39 +167,25 @@ class FootballPreprocesses(object):
         away_team_ids = self._dataset['AwayTeamAPI'].drop_duplicates().dropna().tolist()
         teams_players = {}
 
-        for home_team in home_team_ids:
-            teams_players[home_team] = []
+        for home_team, away_team in zip(home_team_ids, away_team_ids):
             df = self._match_data.loc[
                 self._match_data['home_team_api_id'] == home_team]  # Get the dataframe of each home team
             home_team_lineup = df.loc[:,
                                'home_player_1':'home_player_11']  # Get the lineup of players id of the home team
 
-            if home_team_lineup.shape[0] == 0: # If loc result were 0 continue
-                continue
+            if home_team_lineup.shape[0] != 0: # If loc result were 0 continue
+                teams_players[home_team] = self.__unique_value_exctraction(home_team_lineup,
+                                                                           list(home_team_lineup.columns))
 
-            for column in home_team_lineup.columns:
-                #  Remove duplicates for each player_X feature
-                players = home_team_lineup.drop_duplicates(column)[column].tolist()
-                teams_players[home_team] += players
-            x = self.__unique_value_exctraction(home_team_lineup, list(home_team_lineup.columns))
-
-            # Remove duplicates where player 1 was player 2 for example
-            teams_players[home_team] = set(teams_players[home_team])
-
-        for away_team in away_team_ids:
-            teams_players[away_team] = []
             df = self._match_data.loc[
-                self._match_data['away_team_api_id'] == away_team]  # Get the dataframe of each home team
+                self._match_data['away_team_api_id'] == away_team]  # Get the dataframe of each away team
             away_team_lineup = df.loc[:,
-                               'away_player_1':'away_player_11']  # Get the lineup of players id of the home team
+                               'away_player_1':'away_player_11']  # Get the lineup of players id of the away team
 
-            if away_team_lineup.shape[0] == 0:  # If loc result were 0 continue
-                continue
+            if away_team_lineup.shape[0] != 0:  # If loc result were 0 continue
+                teams_players[away_team] = self.__unique_value_exctraction(away_team_lineup,
+                                                                           list(away_team_lineup.columns))
 
-            for column in away_team_lineup.columns:
-                #  Remove duplicates for each player_X feature
-                players = away_team_lineup.drop_duplicates(column)[column].tolist()
-                teams_players[away_team] += players
 
         team_average_players_ratings = {}
 
@@ -282,11 +268,9 @@ class FootballPreprocesses(object):
                 return stat_home_team, stat_away_team
 
     def __add_bets_ods_features(self):
-        match_betting_ods = {"Label": [], "HomeTeamsOdds": [], "AwayTeamOdds": []}
         new_df = pd.DataFrame()
 
         for label, row in self._dataset.iterrows():
-            match_betting_ods["Label"] += [label]
 
 
             away_team ,home_team = row.at['HomeTeamAPI'], row.at['AwayTeamAPI']
@@ -299,17 +283,14 @@ class FootballPreprocesses(object):
 
             betting_ods = match.loc[:, self._bets_columns['all'][0]: self._bets_columns['all'][-1]]
 
-            # TODO: think about something other than a flag
-
             for bet, column in zip(['h', 'a'], ['HomeTeamsOdds', "AwayTeamOdds"]): # TODO: Think if Draw is needed
 
                 home_or_away_bets_odds = betting_ods.loc[:, self._bets_columns[bet]]
+                #  For each match calculate the mean of all betting ods and that will be the match bet odd.
                 betting_odd = home_or_away_bets_odds.fillna(0).values.mean()
-                if not betting_odd:
+                if not betting_odd: # TODO: Show guy
                     print("a")
                     continue
-                #  For each match calculate the mean of all betting ods and that will be the match bet odd.
-                match_betting_ods[column] += [betting_odd]
                 row[column] = betting_odd
 
             #  Create a new dataframe with the new Odss feature
@@ -320,12 +301,11 @@ class FootballPreprocesses(object):
         self._dataset = new_df
 
 
-
     def __remove_row(self, row_index):
         self._dataset = self._dataset[self._dataset.index != row_index]
 
 
-p = FootballPreprocesses("database.sqlite")
+p = FootballPreprocessesor("database.sqlite")
 data = p.preprocess()
 x = p._match_data
 #
