@@ -5,7 +5,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import sqlite3  # SQLite
 import xml.etree.ElementTree as ET
-
+from copy import deepcopy
 
 class FootballPreprocessesor(object):
     """
@@ -28,9 +28,12 @@ class FootballPreprocessesor(object):
         """
         self.__clear_null_from_match()
         self.__shrink_match_data_dimension()
+        self.__parse_xml()
+        self.__add_team_goals_avg()
+        self.__add_goals_difference()
+        self.__add_bets_ods_features()
         self.__add_team_rankings()
         self.__add_team_stats()
-        self.__add_bets_ods_features()
         # self.__add_classification()
         self._database_connection.close()
 
@@ -62,15 +65,15 @@ class FootballPreprocessesor(object):
                                             LEFT JOIN Team AS HT on HT.team_api_id = Match.home_team_api_id
                                             LEFT JOIN Team AS AT on AT.team_api_id = Match.away_team_api_id                          
                                             ORDER by date
-                                            LIMIT 10000
+                                            LIMIT 5000
                                             ;""", self._database_connection)
         data1 = data[["home_team", "away_team", "season", "home_team_goal", "away_team_goal"]]
 
         self._dataset = pd.DataFrame(
             {"HomeTeamAPI": data['home_team_api_id'], "HomeTeam": data1.home_team + data1.season,
              'AwayTeamAPI': data['away_team_api_id'],
-             "AwayTeam": data1.away_team + data1.season, "HomeTeamGaols": data1.home_team_goal,
-             "AwayTeamGaols": data1.away_team_goal})
+             "AwayTeam": data1.away_team + data1.season, "HomeTeamGoals": data1.home_team_goal,
+             "AwayTeamGoals": data1.away_team_goal})
 
     def __load_player_attr_table(self):
         self._player_attributes_data = pd.read_sql_query("""SELECT DISTINCT player_api_id, overall_rating 
@@ -85,6 +88,7 @@ class FootballPreprocessesor(object):
                                                 FROM Team_Attributes
                                                 GROUP BY team_api_id
                                                 """, self._database_connection)
+        self._team_attributes_data.set_index('team_api_id', inplace=True, drop=True)
 
     def __load_match_table(self):
         self._match_data = pd.read_sql("""SELECT *
@@ -111,7 +115,7 @@ class FootballPreprocessesor(object):
                                        away_player_9 IS NOT NULL AND
                                        away_player_10 IS NOT NULL AND
                                        away_player_11 IS NOT NULL 
-                                       LIMIT 10000
+                                       LIMIT 5000
                                        """, self._database_connection)  # TODO: Remove the limit
 
     def __unique_value_exctraction(self, df: pd.DataFrame, columns: list) -> set:
@@ -247,11 +251,54 @@ class FootballPreprocessesor(object):
 
         self._dataset['win'] = win
 
-    def __parse_cards_xml(self, xml_document, home_team, away_team, card_type='y'):
+    def __parse_xml(self):
+        self._match_data[['on_target_shot_home_team', 'on_target_shot_away_team']] = self._match_data[
+            ['shoton', 'home_team_api_id', 'away_team_api_id']].apply(
+            lambda x: self.__calculate_stats_both_teams(x['shoton'], x['home_team_api_id'], x['away_team_api_id']), axis=1,
+            result_type="expand")
+        self._match_data[['on_target_shot_home_team', 'on_target_shot_away_team']] = self._match_data[['shoton', 'home_team_api_id', 'away_team_api_id']].apply(lambda x: self.__mean_for_team_for_feat(self._match_data, x['home_team_api_id'], 'home_team_api_id', 'shoton') if not x['shoton'] else x['shoton'])
+
+
+        self._match_data[['yellow_card_home_team', 'yellow_card_away_team']] = self._match_data[
+            ['card', 'home_team_api_id', 'away_team_api_id']].apply(
+            lambda x: self.__calculate_stats_both_teams(x['card'], x['home_team_api_id'], x['away_team_api_id']), axis=1,
+            result_type="expand")
+        self._match_data[['red_card_home_team', 'red_card_away_team']] = self._match_data[['card', 'home_team_api_id', 'away_team_api_id']].apply(
+            lambda x: self.__calculate_stats_both_teams(x['card'], x['home_team_api_id'], x['away_team_api_id'],
+                                                 card_type='r'), axis=1, result_type="expand")
+        self._match_data[['crosses_home_team', 'crosses_away_team']] = self._match_data[['cross', 'home_team_api_id', 'away_team_api_id']].apply(
+            lambda x: self.__calculate_stats_both_teams(x['cross'], x['home_team_api_id'], x['away_team_api_id']), axis=1,
+            result_type="expand")
+        self._match_data[['corner_home_team', 'corner_away_team']] = self._match_data[['corner', 'home_team_api_id', 'away_team_api_id']].apply(
+            lambda x: self.__calculate_stats_both_teams(x['corner'], x['home_team_api_id'], x['away_team_api_id']), axis=1,
+            result_type="expand")
+        self._match_data[['possession_home_team', 'possession_away_team']] = self._match_data[
+            ['possession', 'home_team_api_id', 'away_team_api_id']].apply(
+            lambda x: self.__calculate_stats_both_teams(x['possession'], x['home_team_api_id'], x['away_team_api_id']), axis=1,
+            result_type="expand")
+
+        print()
+
+    def __mean_for_team_for_feat(self, df: pd.DataFrame, team, team_id, feature):
+        team_df = df.loc[df[team_id] == team]
+        feat_avg = team_df[feature].mean()
+
+        return  feat_avg
+
+    # def fill_null_features(self, df, feature):
+    #
+    #     for label, row in df.iterrows():
+
+
+    def __calculate_stats_both_teams(self, xml_document, home_team, away_team, card_type='y'):
+        if not xml_document:
+            return None,None
+
+        tree = ET.fromstring(xml_document)
         stat_home_team = 0
         stat_away_team = 0
-        tree = ET.fromstring(xml_document)
 
+        # Dealing with card type using the root element & the card type argument
         if tree.tag == 'card':
             for child in tree.iter('value'):
                 # Some xml docs have no card_type element in the tree. comment section seems to have that information
@@ -259,14 +306,29 @@ class FootballPreprocessesor(object):
                     if child.find('comment').text == card_type:
                         if int(child.find('team').text) == home_team:
                             stat_home_team += 1
-                    else:
-                        stat_away_team += 1
-
+                        else:
+                            stat_away_team += 1
                 except AttributeError:
                     # Some values in the xml doc don't have team values, so there isn't much we can do at this stage
                     pass
 
-                return stat_home_team, stat_away_team
+            return stat_home_team, stat_away_team
+
+        # Lets take the last possession stat which is available from the xml doc
+        if tree.tag == 'possession':
+            try:
+                last_value = [child for child in tree.iter('value')][-1]
+                return int(last_value.find('homepos').text), int(last_value.find('awaypos').text)
+            except:
+                return None, None
+
+        # Taking care of all other stats by extracting based on the home team & away team api id's
+        for team in [int(stat.text) for stat in tree.findall('value/team')]:
+            if team == home_team:
+                stat_home_team += 1
+            else:
+                stat_away_team += 1
+        return stat_home_team, stat_away_team
 
     def __add_bets_ods_features(self):
         new_df = pd.DataFrame()
@@ -297,9 +359,78 @@ class FootballPreprocessesor(object):
         del self._dataset
         self._dataset = new_df
 
+    def __add_team_goals_avg(self):
+        home_new_data = {"HomeTeamAPI":[], "HomeTeamAvgGoals": []}
+        away_new_data = {"AwayTeamAPI":[], "AwayTeamAvgGoals": []}
+        for label, row in self._team_attributes_data.iterrows():
+            home_team_games = self._dataset.loc[(self._dataset['HomeTeamAPI'] == label)]
+            home_team_goals_avg = home_team_games['HomeTeamGoals'].mean()
+            home_new_data['HomeTeamAPI'] += [label]
+            home_new_data['HomeTeamAvgGoals'] += [home_team_goals_avg]
+
+            away_team_games = self._dataset.loc[(self._dataset['AwayTeamAPI'] == label)]
+            away_team_goals_avg = away_team_games['AwayTeamGoals'].mean()
+            away_new_data['AwayTeamAPI'] += [label]
+            away_new_data['AwayTeamAvgGoals'] += [away_team_goals_avg]
+
+        new_home_df = pd.DataFrame(home_new_data)
+        new_away_df = pd.DataFrame(away_new_data)
+
+        self._dataset = pd.merge(self._dataset, new_home_df, how="left", on="HomeTeamAPI")
+        self._dataset = pd.merge(self._dataset, new_away_df, how="left", on="AwayTeamAPI")
+        return
+
+    def __add_goals_difference(self):
+        """
+        The method will be responsible for adding the goals difference between teams features.
+        For each match the home team and away team will be taken into account in the goals difference
+        calculation.
+        :return:
+        """
+        copy_df = deepcopy(self._dataset) # Create a copy of the dataset to not change it
+        new_data = {"HomeTeamAPI": [], "AwayTeamAPI":[], "GoalDiff": []}
+
+        #  Iterate over the data set until there are no more matches
+        while copy_df.shape[0] > 0:
+            match = copy_df.iloc[0] # Take the first match each iteration
+
+            away_team, home_team = match.at['HomeTeamAPI'], match.at['AwayTeamAPI']
+
+            #  Get all the matches of the away_team against the home_team and vice versa
+            matches1 = copy_df.loc[(copy_df['HomeTeamAPI'] == home_team) & (
+                        copy_df['AwayTeamAPI'] == away_team)]
+            matches2 = copy_df.loc[(copy_df['AwayTeamAPI'] == home_team) & (
+                    copy_df['HomeTeamAPI'] == away_team)]
+
+            home_goals = matches1["HomeTeamGoals"].sum()
+            away_goals = matches2["AwayTeamGoals"].sum()
+
+            total_home_team_goals = home_goals + away_goals
+
+            home_goals = matches2["HomeTeamGoals"].sum()
+            away_goals = matches1["AwayTeamGoals"].sum()
+
+            total_away_team_goals = home_goals + away_goals
+
+            diff = total_home_team_goals - total_away_team_goals
+
+            new_data["HomeTeamAPI"] += [home_team]
+            new_data["AwayTeamAPI"] += [away_team]
+            new_data["GoalDiff"] += [diff]
+
+            new_data["HomeTeamAPI"] += [away_team]
+            new_data["AwayTeamAPI"] += [home_team]
+            new_data["GoalDiff"] += [-diff]
+
+            #  Delete the matches from the copy df
+            copy_df.drop(list(matches1.index), axis="index", inplace=True)
+            copy_df.drop(list(matches2.index), axis="index", inplace=True)
+
+        new_data_df = pd.DataFrame(new_data)
+        self._dataset = pd.merge(self._dataset, new_data_df, how="inner", on=["HomeTeamAPI","AwayTeamAPI"])
 
     def __remove_row(self, row_index):
-        self._dataset = self._dataset[self._dataset.index != row_index]
+            self._dataset = self._dataset[self._dataset.index != row_index]
 
 
 p = FootballPreprocessesor("database.sqlite")
