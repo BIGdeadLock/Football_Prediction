@@ -114,18 +114,32 @@ class FootballPreprocesses(object):
                                        """, self._database_connection)  # TODO: Remove the limit
 
     def __clear_null_from_match(self):
-        cols = self._match_data.loc[:,"B365H", "BSA"]
-        self.bets_columns = [c for c in cols]
-        #  Drop an match observation if all the bets columns have nulls
-        self._dataset.dropna(axis=0, subset=self.bets_columns, how="all")
+        """
+        The method will be responsible for deleting nulls from the match data based on rules.
+        :return:
+        """
+
+        # Rule 1 - Clear rows which contains nulls in all the home bets odds columns or away team bets odds columns
+        cols = self._match_data.loc[:,"B365H":"BSA"]
+        self._bets_columns = {"all": [c for c in cols]}
+        self._bets_columns['h'] = [c for c in self._bets_columns['all'] if c[-1] == "H"]
+        self._bets_columns['a'] = [c for c in self._bets_columns['all'] if c[-1] == "A"]
+        self._bets_columns['a'] = [c for c in self._bets_columns['all'] if c[-1] == "D"]
+        # Drop a match observation if all the home team bets have null, like wise to the away_team
+        self._match_data.dropna(axis=0, subset=self._bets_columns['h'], how="all", inplace=True)
+        self._match_data.dropna(axis=0, subset=self._bets_columns['a'], how="all", inplace=True)
 
     def __shrink_match_data_dimension(self):
+        """
+        The method will be responsible for deleting unwanted columns (feature) from the match data.
+        :return:
+        """
         home_player_X_positions = [f"home_player_X{i}" for i in range(1,12)]
         home_player_Y_positions = [f"home_player_Y{i}" for i in range(1,12)]
         away_player_X_positions = [f"away_player_X{i}" for i in range(1,12)]
         away_player_Y_positions = [f"away_player_Y{i}" for i in range(1,12)]
         for col in [home_player_X_positions, home_player_Y_positions, away_player_X_positions, away_player_Y_positions]:
-            self._dataset.drop(col, axis=1, inplace=True)
+            self._match_data.drop(col, axis=1, inplace=True)
 
     def __add_team_rankings(self):
         """
@@ -251,6 +265,7 @@ class FootballPreprocesses(object):
 
     def __add_bets_ods_features(self):
         match_betting_ods = {"Label": [], "HomeTeamsOdds": [], "AwayTeamOdds": []}
+        new_df = pd.DataFrame()
 
         for label, row in self._dataset.iterrows():
             match_betting_ods["Label"] += [label]
@@ -264,24 +279,29 @@ class FootballPreprocesses(object):
                 self.__remove_row(label)
                 continue
 
-            betting_ods = match.loc[:, "B365H": "BSA"]
+            betting_ods = match.loc[:, self._bets_columns['all'][0]: self._bets_columns['all'][-1]]
 
             # TODO: think about something other than a flag
 
-            for bet, column in zip(['H', 'A'], ['HomeTeamsOdds', "AwayTeamOdds"]): # TODO: Think if Draw is needed
-                betting_odds = betting_ods.loc[:, betting_ods.columns.str.endswith(bet)]
-                betting_odd = betting_odds.fillna(0).values.mean()
-                if not betting_odd:  # If the observation does have all nulls delete it from the dataset
-                    self.__remove_row(label)
-                else:
-                    #  For each match calculate the mean of all betting ods and that will be the match bet odd.
-                    match_betting_ods[column] += [betting_odd]
+            for bet, column in zip(['h', 'a'], ['HomeTeamsOdds', "AwayTeamOdds"]): # TODO: Think if Draw is needed
 
-                    if bet == 'H':
-                        match_betting_ods["Label"] += [label] # TODO: Need to add only once
+                home_or_away_bets_odds = betting_ods.loc[:, self._bets_columns[bet]]
+                betting_odd = home_or_away_bets_odds.fillna(0).values.mean()
+                if not betting_odd:
+                    print("a")
+                    continue
+                #  For each match calculate the mean of all betting ods and that will be the match bet odd.
+                match_betting_ods[column] += [betting_odd]
+                row[column] = betting_odd
 
-        bets_df = pd.DataFrame(match_betting_ods) #TODO: Fix unqeual columns length
-        self._dataset = pd.merge(self._dataset, bets_df, left_index=True, right_index=True)
+            #  Create a new dataframe with the new Odss feature
+            new_df = new_df.append(row)
+
+        # update the new df
+        del self._dataset
+        self._dataset = new_df
+
+
 
     def __remove_row(self, row_index):
         self._dataset = self._dataset[self._dataset.index != row_index]
