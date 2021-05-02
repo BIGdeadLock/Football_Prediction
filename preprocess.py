@@ -1,8 +1,5 @@
-import os
 import pandas as pd
-import numpy as np
-import seaborn as sns
-import matplotlib.pyplot as plt
+import definition
 import sqlite3  # SQLite
 import xml.etree.ElementTree as ET
 from copy import deepcopy
@@ -28,13 +25,28 @@ class FootballPreprocessesor(object):
         """
         self.__clear_null_from_match()
         self.__shrink_match_data_dimension()
+
         self.__parse_xml()
+        self.__fill_with_mean(definition.TOKEN_MATCH_HOME_TEAM_SHOTON, definition.TOKEN_HOME_TEAM_NAME)
+        self.__fill_with_mean(definition.TOKEN_MATCH_AWAY_TEAM_SHOTON, definition.TOKEN_AWAY_TEAM_NAME)
+        self.__fill_with_mean(definition.TOKEN_MATCH_HOME_TEAM_YELLOWCARD, definition.TOKEN_HOME_TEAM_NAME)
+        self.__fill_with_mean(definition.TOKEN_MATCH_AWAY_TEAM_YELLOWCARD, definition.TOKEN_AWAY_TEAM_NAME)
+        self.__fill_with_mean(definition.TOKEN_MATCH_HOME_TEAM_REDCARD, definition.TOKEN_HOME_TEAM_NAME)
+        self.__fill_with_mean(definition.TOKEN_MATCH_AWAY_TEAM_REDCARD, definition.TOKEN_AWAY_TEAM_NAME)
+        self.__fill_with_mean(definition.TOKEN_MATCH_HOME_TEAM_CROSSES, definition.TOKEN_HOME_TEAM_NAME)
+        self.__fill_with_mean(definition.TOKEN_MATCH_AWAY_TEAM_CROSSES, definition.TOKEN_AWAY_TEAM_NAME)
+        self.__fill_with_mean(definition.TOKEN_MATCH_HOME_TEAM_CORNERS, definition.TOKEN_HOME_TEAM_NAME)
+        self.__fill_with_mean(definition.TOKEN_MATCH_AWAY_TEAM_CORNERS, definition.TOKEN_AWAY_TEAM_NAME)
+        self.__fill_with_mean('possession_home_team', definition.TOKEN_HOME_TEAM_NAME)
+        self.__fill_with_mean('possession_away_team', definition.TOKEN_AWAY_TEAM_NAME)
+        self.__join_match_table()
+        self.__add_team_stats()
         self.__add_team_goals_avg()
         self.__add_goals_difference()
         self.__add_bets_ods_features()
         self.__add_team_rankings()
-        self.__add_team_stats()
-        # self.__add_classification()
+
+        self.__add_classification()
         self._database_connection.close()
 
         return self._dataset
@@ -65,12 +77,13 @@ class FootballPreprocessesor(object):
                                             LEFT JOIN Team AS HT on HT.team_api_id = Match.home_team_api_id
                                             LEFT JOIN Team AS AT on AT.team_api_id = Match.away_team_api_id                          
                                             ORDER by date
-                                            LIMIT 5000
+                                           
                                             ;""", self._database_connection)
         data1 = data[["home_team", "away_team", "season", "home_team_goal", "away_team_goal"]]
 
         self._dataset = pd.DataFrame(
-            {"HomeTeamAPI": data['home_team_api_id'], "HomeTeam": data1.home_team + data1.season,
+            {"id": data["id"],
+                "HomeTeamAPI": data['home_team_api_id'], "HomeTeam": data1.home_team + data1.season,
              'AwayTeamAPI': data['away_team_api_id'],
              "AwayTeam": data1.away_team + data1.season, "HomeTeamGoals": data1.home_team_goal,
              "AwayTeamGoals": data1.away_team_goal})
@@ -88,7 +101,7 @@ class FootballPreprocessesor(object):
                                                 FROM Team_Attributes
                                                 GROUP BY team_api_id
                                                 """, self._database_connection)
-        self._team_attributes_data.set_index('team_api_id', inplace=True, drop=True)
+        #self._team_attributes_data.set_index('team_api_id', inplace=True, drop=True)
 
     def __load_match_table(self):
         self._match_data = pd.read_sql("""SELECT *
@@ -115,7 +128,7 @@ class FootballPreprocessesor(object):
                                        away_player_9 IS NOT NULL AND
                                        away_player_10 IS NOT NULL AND
                                        away_player_11 IS NOT NULL 
-                                       LIMIT 5000
+                                       
                                        """, self._database_connection)  # TODO: Remove the limit
 
     def __unique_value_exctraction(self, df: pd.DataFrame, columns: list) -> set:
@@ -239,10 +252,10 @@ class FootballPreprocessesor(object):
         """
         win = []
         for l in range(0, len(self._dataset)):
-            if self._dataset.HomeTeamGaols[l] > self._dataset.AwayTeamGaols[l]:
+            if self._dataset.HomeTeamGoals[l] > self._dataset.AwayTeamGoals[l]:
                 k1 = 1
                 win.append(k1)
-            elif self._dataset.HomeTeamGaols[l] == self._dataset.AwayTeamGaols[l]:
+            elif self._dataset.HomeTeamGoals[l] == self._dataset.AwayTeamGoals[l]:
                 k1 = 0
                 win.append(k1)
             else:
@@ -256,7 +269,7 @@ class FootballPreprocessesor(object):
             ['shoton', 'home_team_api_id', 'away_team_api_id']].apply(
             lambda x: self.__calculate_stats_both_teams(x['shoton'], x['home_team_api_id'], x['away_team_api_id']), axis=1,
             result_type="expand")
-        self.__mean_for_team_for_feat('on_target_shot_home_team', 'home')
+        # self.__mean_for_team_for_feat('on_target_shot_home_team', 'home')
 
         self._match_data[['yellow_card_home_team', 'yellow_card_away_team']] = self._match_data[
             ['card', 'home_team_api_id', 'away_team_api_id']].apply(
@@ -276,19 +289,27 @@ class FootballPreprocessesor(object):
             lambda x: self.__calculate_stats_both_teams(x['possession'], x['home_team_api_id'], x['away_team_api_id']), axis=1,
             result_type="expand")
 
-        print()
 
-    def __mean_for_team_for_feat(self,  feature, home_or_away):
-        for team, row in self._team_attributes_data.iterrows():
+    def __fill_with_mean(self, feature, home_or_away):
+        for team in self._team_attributes_data['team_api_id'].tolist():
             team_matches = self._match_data.loc[self._match_data[f'{home_or_away}_team_api_id']== team]
+
             if team_matches.shape[0] != 0:
                 not_null = team_matches[~team_matches[feature].isna()]
-                if not_null.shape[0] != 0:
+                nulls = team_matches[team_matches[feature].isna()]
+                matches_indexes = nulls.index.tolist()
+
+                if not_null.shape[0] != 0 and nulls.shape[0] != 0:
                     avg = not_null[feature].mean()
-                    team_matches = team_matches[feature].fillna(avg)
+                    if avg == 0:
+                        #  If the average is 0 - all the rows have 0 value. Delete them
+                        self._match_data.drop(matches_indexes, inplace=True)
+                    else:
+                        self._match_data.at[matches_indexes, feature] = avg
 
                 else:
-                    team_matches = team_matches[feature].fillna(0.0)
+                    #  If all the values of the feature are null - delete it
+                    self._match_data.drop(matches_indexes, inplace=True)
 
 
 
@@ -365,7 +386,7 @@ class FootballPreprocessesor(object):
     def __add_team_goals_avg(self):
         home_new_data = {"HomeTeamAPI":[], "HomeTeamAvgGoals": []}
         away_new_data = {"AwayTeamAPI":[], "AwayTeamAvgGoals": []}
-        for label, row in self._team_attributes_data.iterrows():
+        for label in self._team_attributes_data['team_api_id'].tolist():
             home_team_games = self._dataset.loc[(self._dataset['HomeTeamAPI'] == label)]
             home_team_goals_avg = home_team_games['HomeTeamGoals'].mean()
             home_new_data['HomeTeamAPI'] += [label]
@@ -435,137 +456,13 @@ class FootballPreprocessesor(object):
     def __remove_row(self, row_index):
             self._dataset = self._dataset[self._dataset.index != row_index]
 
+    def __join_match_table(self):
+        to_join = self._match_data.loc[:, 'on_target_shot_home_team': 'possession_away_team']
+        ids = self._match_data.loc[:, 'id']
+        to_join = pd.concat([to_join, ids], axis=1)
+        self._dataset = pd.merge(self._dataset, to_join, how="inner", on="id")
+
 
 p = FootballPreprocessesor("database.sqlite")
 data = p.preprocess()
-x = p._match_data
-#
-# # Create connection
-
-database_connection = sqlite3.connect("database.sqlite")
-# data = pd.read_sql("""SELECT Match.id, Match.home_team_api_id, Match.away_team_api_id,
-#                                         Country.name AS country_name,
-#                                         League.name AS league_name,
-#                                         season,
-#                                         stage,
-#                                         date,
-#                                         HT.team_long_name AS  home_team,
-#                                         AT.team_long_name AS away_team,
-#                                         home_team_goal,
-#                                         away_team_goal
-#                                 FROM Match
-#                                 JOIN Country on Country.id = Match.country_id
-#                                 JOIN League on League.id = Match.league_id
-#                                 LEFT JOIN Team AS HT on HT.team_api_id = Match.home_team_api_id
-#                                 LEFT JOIN Team AS AT on AT.team_api_id = Match.away_team_api_id
-#                                 ORDER by date
-#                                 ;""", database_connection)
-# data1=data[["home_team","away_team","season","home_team_goal","away_team_goal"]]
-#
-# dataset=pd.DataFrame({"HomeTeamAPI":data['home_team_api_id'] ,"HomeTeam":data1.home_team+data1.season,'AwayTeamAPI':data['away_team_api_id'],
-#                    "AwayTeam":data1.away_team+data1.season,"HomeTeamGaols":data1.home_team_goal,"AwayTeamGaols":data1.away_team_goal})
-#
-# tables = pd.read_sql("""SELECT *
-#                         FROM sqlite_master
-#                         WHERE type='table'; """, database_connection)
-#
-# # Player Attributes Table with only the unique player_api_id feature and the overall_rating feature
-# player_attributes = pd.read_sql_query("""SELECT DISTINCT player_api_id, overall_rating
-#                                          FROM Player_Attributes
-#                                          GROUP BY player_api_id
-#                                          """, database_connection)
-# # set the index to be the player_api_id field
-# player_attributes.set_index('player_api_id', inplace=True, drop=True)
-#
-# # Matches Table
-# match = pd.read_sql("""SELECT *
-#                        FROM Match
-#                        WHERE home_player_1 IS NOT NULL AND
-#                        home_player_2 IS NOT NULL AND
-#                        home_player_3 IS NOT NULL AND
-#                        home_player_4 IS NOT NULL AND
-#                        home_player_5 IS NOT NULL AND
-#                        home_player_6 IS NOT NULL AND
-#                        home_player_7 IS NOT NULL AND
-#                        home_player_8 IS NOT NULL AND
-#                        home_player_9 IS NOT NULL AND
-#                        home_player_10 IS NOT NULL AND
-#                        home_player_11 IS NOT NULL AND
-#                        away_player_1 IS NOT NULL  AND
-#                        away_player_2 IS NOT NULL AND
-#                        away_player_3 IS NOT NULL AND
-#                        away_player_4 IS NOT NULL AND
-#                        away_player_5 IS NOT NULL AND
-#                        away_player_6 IS NOT NULL AND
-#                        away_player_7 IS NOT NULL AND
-#                        away_player_8 IS NOT NULL AND
-#                        away_player_9 IS NOT NULL AND
-#                        away_player_10 IS NOT NULL AND
-#                        away_player_11 IS NOT NULL
-#                        LIMIT 5000
-#                        """, database_connection) # TODO: Remove the limit
-#
-# # Team Attributes Table
-# team_attribute = pd.read_sql("""SELECT team_api_id, buildUpPlaySpeed, chanceCreationShooting, defencePressure
-#                                  FROM Team_Attributes
-#                                  GROUP BY team_api_id
-#                                  """, database_connection)
-#
-# del data1
-# del data
-# database_connection.close()
-#
-#
-# home_team_ids = dataset['HomeTeamAPI'].drop_duplicates().dropna().tolist()
-# away_team_ids = dataset['AwayTeamAPI'].drop_duplicates().dropna().tolist()
-#
-#
-#
-#
-# home_players_features = [f"home_player_{feat}" for feat in range(1,11)]
-# away_players_features = [f"away_player_{feat}" for feat in range(1,11)]
-# teams_players = {}
-#
-# for home_team in home_team_ids:
-#     teams_players[home_team] = []
-#     df = match.loc[match['home_team_api_id'] == home_team] # Get the dataframe of each home team
-#     home_team_lineup = df.loc[:, 'home_player_1':'home_player_11']  # Get the lineup of players id of the home team
-#     home_team_lineup.drop_duplicates(subset=home_players_features, keep=False, inplace=True)
-#     for column in home_team_lineup.columns:
-#         #  Remove duplicates for each player_X feature
-#         players = home_team_lineup.drop_duplicates(column)[column].tolist()
-#         teams_players[home_team] += players
-#
-#     # Remove duplicates where player 1 was player 2 for example
-#     teams_players[home_team] = set(teams_players[home_team])
-#
-# for away_team in home_team_ids:
-#     teams_players[away_team] = []
-#     df = match.loc[match['away_team_api_id'] == away_team]  # Get the dataframe of each home team
-#     away_team_lineup = df.loc[:, 'away_player_1':'away_player_11']  # Get the lineup of players id of the home team
-#     away_team_lineup.drop_duplicates(subset=away_players_features, keep=False, inplace=True)
-#     for column in away_team_lineup.columns:
-#         #  Remove duplicates for each player_X feature
-#         players = away_team_lineup.drop_duplicates(column)[column].tolist()
-#         teams_players[away_team] += players
-#
-#
-# team_average_players_ratings = {}
-#
-# for team, players in teams_players.items():
-#     if players:
-#         players_ratings = player_attributes.loc[list(players)]  # Get the team players ratings
-#         team_average_players_ratings[team] = players_ratings.mean().at['overall_rating']
-#
-# home_team_average_players_ratings = pd.DataFrame({"HomeTeamAPI":list(team_average_players_ratings.keys()), "HomeTeamRatings":list(team_average_players_ratings.values())})
-# away_team_average_players_ratings = pd.DataFrame({"AwayTeamAPI":list(team_average_players_ratings.keys()), "AwayTeamRatings":list(team_average_players_ratings.values())})
-#
-# dataset = pd.merge(dataset, home_team_average_players_ratings, how="inner", on="HomeTeamAPI")
-# dataset = pd.merge(dataset, away_team_average_players_ratings, how="inner", on="AwayTeamAPI")
-# dataset = pd.merge(dataset, team_attribute, how="inner", left_on="HomeTeamAPI",right_on="team_api_id").\
-#     rename(columns={'buildUpPlaySpeed': 'HomeTeamPlaySpead', "chanceCreationShooting": "HomeTeamCreatonShooting",
-#                     "defencePressure": "HomeTeamDefencePressure"})
-# dataset = pd.merge(dataset, team_attribute, how="inner", left_on="AwayTeamAPI",right_on="team_api_id").\
-#     rename(columns={'buildUpPlaySpeed': 'AwayTeamPlaySpead', "chanceCreationShooting": "AwayTeamCreatonShooting",
-#                     "defencePressure": "AwayTeamDefencePressure"})
-# dataset = dataset.drop(columns={'team_api_id_x', 'team_api_id_y'})
+data.to_csv("dataset.csv")
