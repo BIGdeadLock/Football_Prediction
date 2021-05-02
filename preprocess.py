@@ -256,8 +256,7 @@ class FootballPreprocessesor(object):
             ['shoton', 'home_team_api_id', 'away_team_api_id']].apply(
             lambda x: self.__calculate_stats_both_teams(x['shoton'], x['home_team_api_id'], x['away_team_api_id']), axis=1,
             result_type="expand")
-        self._match_data[['on_target_shot_home_team', 'on_target_shot_away_team']] = self._match_data[['shoton', 'home_team_api_id', 'away_team_api_id']].apply(lambda x: self.__mean_for_team_for_feat(self._match_data, x['home_team_api_id'], 'home_team_api_id', 'shoton') if not x['shoton'] else x['shoton'])
-
+        self.__mean_for_team_for_feat('on_target_shot_home_team', 'home')
 
         self._match_data[['yellow_card_home_team', 'yellow_card_away_team']] = self._match_data[
             ['card', 'home_team_api_id', 'away_team_api_id']].apply(
@@ -279,15 +278,19 @@ class FootballPreprocessesor(object):
 
         print()
 
-    def __mean_for_team_for_feat(self, df: pd.DataFrame, team, team_id, feature):
-        team_df = df.loc[df[team_id] == team]
-        feat_avg = team_df[feature].mean()
+    def __mean_for_team_for_feat(self,  feature, home_or_away):
+        for team, row in self._team_attributes_data.iterrows():
+            team_matches = self._match_data.loc[self._match_data[f'{home_or_away}_team_api_id']== team]
+            if team_matches.shape[0] != 0:
+                not_null = team_matches[~team_matches[feature].isna()]
+                if not_null.shape[0] != 0:
+                    avg = not_null[feature].mean()
+                    team_matches = team_matches[feature].fillna(avg)
 
-        return  feat_avg
+                else:
+                    team_matches = team_matches[feature].fillna(0.0)
 
-    # def fill_null_features(self, df, feature):
-    #
-    #     for label, row in df.iterrows():
+
 
 
     def __calculate_stats_both_teams(self, xml_document, home_team, away_team, card_type='y'):
