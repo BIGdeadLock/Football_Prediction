@@ -17,6 +17,7 @@ class FootballPreprocessesor(object):
         self._dataset: pd.DataFrame = None
         self.__load_data()
 
+
     def preprocess(self) -> pd.DataFrame:
         """
         The main method that start the preprocess flow.
@@ -37,16 +38,17 @@ class FootballPreprocessesor(object):
         self.__fill_with_mean(definition.TOKEN_MATCH_AWAY_TEAM_CROSSES, definition.TOKEN_AWAY_TEAM_NAME)
         self.__fill_with_mean(definition.TOKEN_MATCH_HOME_TEAM_CORNERS, definition.TOKEN_HOME_TEAM_NAME)
         self.__fill_with_mean(definition.TOKEN_MATCH_AWAY_TEAM_CORNERS, definition.TOKEN_AWAY_TEAM_NAME)
-        self.__fill_with_mean('possession_home_team', definition.TOKEN_HOME_TEAM_NAME)
-        self.__fill_with_mean('possession_away_team', definition.TOKEN_AWAY_TEAM_NAME)
+        self.__fill_with_mean(definition.TOKEN_MATCH_HOME_TEAM_POSS, definition.TOKEN_HOME_TEAM_NAME)
+        self.__fill_with_mean(definition.TOKEN_MATCH_AWAY_TEAM_POSS, definition.TOKEN_AWAY_TEAM_NAME)
         self.__join_match_table()
         self.__add_team_stats()
         self.__add_team_goals_avg()
         self.__add_goals_difference()
         self.__add_bets_ods_features()
         self.__add_team_rankings()
-
         self.__add_classification()
+
+        self.__remove_uneeded_features()
         self._database_connection.close()
 
         return self._dataset
@@ -75,7 +77,8 @@ class FootballPreprocessesor(object):
                                             JOIN Country on Country.id = Match.country_id
                                             JOIN League on League.id = Match.league_id
                                             LEFT JOIN Team AS HT on HT.team_api_id = Match.home_team_api_id
-                                            LEFT JOIN Team AS AT on AT.team_api_id = Match.away_team_api_id                          
+                                            LEFT JOIN Team AS AT on AT.team_api_id = Match.away_team_api_id
+                                            WHERE  season <> '2015/2016'
                                             ORDER by date
                                            
                                             ;""", self._database_connection)
@@ -91,17 +94,20 @@ class FootballPreprocessesor(object):
     def __load_player_attr_table(self):
         self._player_attributes_data = pd.read_sql_query("""SELECT DISTINCT player_api_id, overall_rating 
                                                        FROM Player_Attributes
+                                                       WHERE strftime('%Y',date)<>'2015' or strftime('%Y',date)<>'2016'
                                                        GROUP BY player_api_id                         
                                                        """, self._database_connection)
         # set the index to be the player_api_id field
         self._player_attributes_data.set_index('player_api_id', inplace=True, drop=True)
 
+
     def __load_team_attr_table(self):
         self._team_attributes_data = pd.read_sql("""SELECT team_api_id, buildUpPlaySpeed, chanceCreationShooting, defencePressure  
                                                 FROM Team_Attributes
+                                                WHERE strftime('%Y',date)<>'2015' or strftime('%Y',date)<>'2016'
                                                 GROUP BY team_api_id
                                                 """, self._database_connection)
-        #self._team_attributes_data.set_index('team_api_id', inplace=True, drop=True)
+
 
     def __load_match_table(self):
         self._match_data = pd.read_sql("""SELECT *
@@ -127,9 +133,9 @@ class FootballPreprocessesor(object):
                                        away_player_8 IS NOT NULL AND
                                        away_player_9 IS NOT NULL AND
                                        away_player_10 IS NOT NULL AND
-                                       away_player_11 IS NOT NULL 
-                                       
-                                       """, self._database_connection)  # TODO: Remove the limit
+                                       away_player_11 IS NOT NULL AND
+                                       season <> '2015/2016'
+                                       """, self._database_connection)
 
     def __unique_value_exctraction(self, df: pd.DataFrame, columns: list) -> set:
         """
@@ -161,16 +167,14 @@ class FootballPreprocessesor(object):
         self._match_data.dropna(axis=0, subset=self._bets_columns['h'], how="all", inplace=True)
         self._match_data.dropna(axis=0, subset=self._bets_columns['a'], how="all", inplace=True)
 
+
     def __shrink_match_data_dimension(self):
         """
         The method will be responsible for deleting unwanted columns (feature) from the match data.
         :return:
         """
-        home_player_X_positions = [f"home_player_X{i}" for i in range(1,12)]
-        home_player_Y_positions = [f"home_player_Y{i}" for i in range(1,12)]
-        away_player_X_positions = [f"away_player_X{i}" for i in range(1,12)]
-        away_player_Y_positions = [f"away_player_Y{i}" for i in range(1,12)]
-        for col in [home_player_X_positions, home_player_Y_positions, away_player_X_positions, away_player_Y_positions]:
+        for col in [definition.TOKEN_MATCH_HOME_PLAYERS_X_POS, definition.TOKEN_MATCH_HOME_PLAYERS_Y_POS,
+                    definition.TOKEN_MATCH_AWAY_PLAYERS_X_POS, definition.TOKEN_MATCH_AWAY_PLAYERS_Y_POS]:
             self._match_data.drop(col, axis=1, inplace=True)
 
     def __add_team_rankings(self):
@@ -210,17 +214,22 @@ class FootballPreprocessesor(object):
         for team, players in teams_players.items():
             if players:
                 players_ratings = self._player_attributes_data.loc[list(players)]  # Get the team players ratings
-                team_average_players_ratings[team] = players_ratings.mean().at['overall_rating']
+                team_average_players_ratings[team] = players_ratings.mean().at[definition.TOKEN_PLAYER_ATTRIB_OVERALL]
 
-        home_team_average_players_ratings = pd.DataFrame({"HomeTeamAPI": list(team_average_players_ratings.keys()),
-                                                          "HomeTeamRatings": list(
+        home_team_average_players_ratings = pd.DataFrame({definition.TOKEN_DS_HOME_TEAM_ID: list(team_average_players_ratings.keys()),
+                                                          definition.TOKEN_DS_HOME_TEAM_Rating: list(
                                                               team_average_players_ratings.values())})
-        away_team_average_players_ratings = pd.DataFrame({"AwayTeamAPI": list(team_average_players_ratings.keys()),
-                                                          "AwayTeamRatings": list(
+        away_team_average_players_ratings = pd.DataFrame({definition.TOKEN_DS_AWAY_TEAM_ID: list(team_average_players_ratings.keys()),
+                                                          definition.TOKEN_DS_AWAY_TEAM_Rating: list(
                                                               team_average_players_ratings.values())})
 
-        self._dataset = pd.merge(self._dataset, home_team_average_players_ratings, how="inner", on="HomeTeamAPI")
-        self._dataset = pd.merge(self._dataset, away_team_average_players_ratings, how="inner", on="AwayTeamAPI")
+        self._dataset = pd.merge(self._dataset, home_team_average_players_ratings, how=definition.TOKEN_INNER_JOIN,
+                                 on=definition.TOKEN_DS_HOME_TEAM_ID)
+        self._dataset = pd.merge(self._dataset, away_team_average_players_ratings, how=definition.TOKEN_INNER_JOIN,
+                                 on=definition.TOKEN_DS_AWAY_TEAM_ID)
+
+        # ------- Test Data ------------
+
 
     def __add_team_stats(self):
         """
@@ -462,7 +471,13 @@ class FootballPreprocessesor(object):
         to_join = pd.concat([to_join, ids], axis=1)
         self._dataset = pd.merge(self._dataset, to_join, how="inner", on="id")
 
+    def __remove_uneeded_features(self):
+        self._dataset.drop(columns=['id'], inplace=True)
+        self._dataset.drop(columns=['AwayTeam'], inplace=True)
+        self._dataset.drop(columns=['HomeTeam'], inplace=True)
+
+
 
 p = FootballPreprocessesor("database.sqlite")
 data = p.preprocess()
-data.to_csv("dataset.csv")
+data.to_csv("dataset_no_2015_2016.csv", index=False)
