@@ -4,6 +4,37 @@ import sqlite3  # SQLite
 import xml.etree.ElementTree as ET
 from copy import deepcopy
 
+definition.TOKEN_DS_HOME_TEAM_AVG_GOALS = "HomeTeamAvgGoals"
+
+definition.TOKEN_LEFT_JOIN = "left"
+
+definition.TOKEN_TEAM_ATTR_ID = 'team_api_id'
+
+definition.TOKEN_INNER_JOIN = "inner"
+
+definition.TOKEN_TEAM_DEF_PRESS = "defencePressure"
+
+definition.TOKEN_TEAM_SPEED = 'buildUpPlaySpeed'
+
+definition.TOKEN_MATCH_AWAY_TEAM_ID = 'away_team_api_id'
+
+definition.TOKEN_MATCH_HOME_TEAM_ID = 'home_team_api_id'
+
+defintion.TOKEN_MATCH_CARD = 'card'
+
+definiton.TOKEN_MATCH_AWAY_TEAM_REDCARD = 'red_card_away_team'
+
+definition.TOKEN_MATCH_HOME_TEAM_REDCARD = 'red_card_home_team'
+
+definition.TOKEN_MATCH_HOME_TEAM_REDCARD = 'red_card_home_team'
+
+definition.TOKEN_MATCH_CARD = 'card'
+
+definition.TOKEN_MATCH_HOME_TEAM_ID = 'home_team_api_id'
+
+definition.TOKEN_MATCH_HOME_TEAM_ID = 'home_team_api_id'
+
+
 class FootballPreprocessesor(object):
     """
     The object that will wrap all the football data cleaning and manipulation functionalities.
@@ -28,17 +59,17 @@ class FootballPreprocessesor(object):
         self.__shrink_match_data_dimension()
 
         self.__parse_xml()
-        self.__fill_with_mean(definition.TOKEN_MATCH_HOME_TEAM_SHOTON, definition.TOKEN_HOME_TEAM_NAME)
+        self.__fill_with_mean(definition.TOKEN_MATCH_HOME_TEAM_SHOTON, definition.TOKEN_HOME_TEAM)
         self.__fill_with_mean(definition.TOKEN_MATCH_AWAY_TEAM_SHOTON, definition.TOKEN_AWAY_TEAM_NAME)
-        self.__fill_with_mean(definition.TOKEN_MATCH_HOME_TEAM_YELLOWCARD, definition.TOKEN_HOME_TEAM_NAME)
+        self.__fill_with_mean(definition.TOKEN_MATCH_HOME_TEAM_YELLOWCARD, definition.TOKEN_HOME_TEAM)
         self.__fill_with_mean(definition.TOKEN_MATCH_AWAY_TEAM_YELLOWCARD, definition.TOKEN_AWAY_TEAM_NAME)
-        self.__fill_with_mean(definition.TOKEN_MATCH_HOME_TEAM_REDCARD, definition.TOKEN_HOME_TEAM_NAME)
+        self.__fill_with_mean(definition.TOKEN_MATCH_HOME_TEAM_REDCARD, definition.TOKEN_HOME_TEAM)
         self.__fill_with_mean(definition.TOKEN_MATCH_AWAY_TEAM_REDCARD, definition.TOKEN_AWAY_TEAM_NAME)
-        self.__fill_with_mean(definition.TOKEN_MATCH_HOME_TEAM_CROSSES, definition.TOKEN_HOME_TEAM_NAME)
+        self.__fill_with_mean(definition.TOKEN_MATCH_HOME_TEAM_CROSSES, definition.TOKEN_HOME_TEAM)
         self.__fill_with_mean(definition.TOKEN_MATCH_AWAY_TEAM_CROSSES, definition.TOKEN_AWAY_TEAM_NAME)
-        self.__fill_with_mean(definition.TOKEN_MATCH_HOME_TEAM_CORNERS, definition.TOKEN_HOME_TEAM_NAME)
+        self.__fill_with_mean(definition.TOKEN_MATCH_HOME_TEAM_CORNERS, definition.TOKEN_HOME_TEAM)
         self.__fill_with_mean(definition.TOKEN_MATCH_AWAY_TEAM_CORNERS, definition.TOKEN_AWAY_TEAM_NAME)
-        self.__fill_with_mean(definition.TOKEN_MATCH_HOME_TEAM_POSS, definition.TOKEN_HOME_TEAM_NAME)
+        self.__fill_with_mean(definition.TOKEN_MATCH_HOME_TEAM_POSS, definition.TOKEN_HOME_TEAM)
         self.__fill_with_mean(definition.TOKEN_MATCH_AWAY_TEAM_POSS, definition.TOKEN_AWAY_TEAM_NAME)
         self.__join_match_table()
         self.__add_team_stats()
@@ -82,14 +113,17 @@ class FootballPreprocessesor(object):
                                             ORDER by date
                                            
                                             ;""", self._database_connection)
-        data1 = data[["home_team", "away_team", "season", "home_team_goal", "away_team_goal"]]
+        data1 = data[[definition.TOKEN_HOME_TEAM_NAME, definition.TOKEN_AWAY_TEAM_NAME,
+                      definition.TOKEN_MATCH_SEASON, definition.TOKEN_MATCH_HOME_TEAM_GOAL,
+                      definition.TOKEN_MATCH_AWAY_TEAM_GOAL]]
 
         self._dataset = pd.DataFrame(
-            {"id": data["id"],
-                "HomeTeamAPI": data['home_team_api_id'], "HomeTeam": data1.home_team + data1.season,
-             'AwayTeamAPI': data['away_team_api_id'],
-             "AwayTeam": data1.away_team + data1.season, "HomeTeamGoals": data1.home_team_goal,
-             "AwayTeamGoals": data1.away_team_goal})
+            {definition.TOKEN_MATCH_ID: data[definition.TOKEN_MATCH_ID],
+                definition.TOKEN_DS_HOME_TEAM_ID: data[definition.TOKEN_MATCH_HOME_TEAM_ID],
+             definition.TOKEN_DS_HOME_TEAM_NAME: data1.home_team + data1.season,
+             definition.TOKEN_DS_AWAY_TEAM_ID : data[definition.TOKEN_MATCH_AWAY_TEAM_ID],
+             definition.TOKEN_DS_AWAY_TEAM_NAME: data1.away_team + data1.season, definition.TOKEN_DS_HOME_TEAM_GOALS: data1.home_team_goal,
+             definition.TOKEN_DS_AWAY_TEAM_GOALS: data1.away_team_goal})
 
     def __load_player_attr_table(self):
         self._player_attributes_data = pd.read_sql_query("""SELECT DISTINCT player_api_id, overall_rating 
@@ -186,24 +220,24 @@ class FootballPreprocessesor(object):
 
         :return:
         """
-        home_team_ids = self._dataset['HomeTeamAPI'].drop_duplicates().dropna().tolist()
-        away_team_ids = self._dataset['AwayTeamAPI'].drop_duplicates().dropna().tolist()
+        home_team_ids = self._dataset[definition.TOKEN_DS_HOME_TEAM_ID].drop_duplicates().dropna().tolist()
+        away_team_ids = self._dataset[definition.TOKEN_DS_AWAY_TEAM_ID].drop_duplicates().dropna().tolist()
         teams_players = {}
 
         for home_team, away_team in zip(home_team_ids, away_team_ids):
             df = self._match_data.loc[
-                self._match_data['home_team_api_id'] == home_team]  # Get the dataframe of each home team
+                self._match_data[definition.TOKEN_MATCH_HOME_TEAM_ID] == home_team]  # Get the dataframe of each home team
             home_team_lineup = df.loc[:,
-                               'home_player_1':'home_player_11']  # Get the lineup of players id of the home team
+                               definition.TOKEN_MATCH_HOME_PLAYERS_ID[0]:definition.TOKEN_MATCH_HOME_PLAYERS_ID[10]]  # Get the lineup of players id of the home team
 
             if home_team_lineup.shape[0] != 0: # If loc result were 0 continue
                 teams_players[home_team] = self.__unique_value_exctraction(home_team_lineup,
                                                                            list(home_team_lineup.columns))
 
             df = self._match_data.loc[
-                self._match_data['away_team_api_id'] == away_team]  # Get the dataframe of each away team
+                self._match_data[definition.TOKEN_MATCH_AWAY_TEAM_ID] == away_team]  # Get the dataframe of each away team
             away_team_lineup = df.loc[:,
-                               'away_player_1':'away_player_11']  # Get the lineup of players id of the away team
+                               definition.TOKEN_MATCH_AWAY_PLAYERS_ID[0]:definition.TOKEN_MATCH_AWAY_PLAYERS_ID[10]]  # Get the lineup of players id of the away team
 
             if away_team_lineup.shape[0] != 0:  # If loc result were 0 continue
                 teams_players[away_team] = self.__unique_value_exctraction(away_team_lineup,
@@ -229,8 +263,6 @@ class FootballPreprocessesor(object):
         self._dataset = pd.merge(self._dataset, away_team_average_players_ratings, how=definition.TOKEN_INNER_JOIN,
                                  on=definition.TOKEN_DS_AWAY_TEAM_ID)
 
-        # ------- Test Data ------------
-
 
     def __add_team_stats(self):
         """
@@ -240,16 +272,18 @@ class FootballPreprocessesor(object):
 
         :return:
         """
-        self._dataset = pd.merge(self._dataset, self._team_attributes_data, how="inner", left_on="HomeTeamAPI",
-                                 right_on="team_api_id"). \
+        self._dataset = pd.merge(self._dataset, self._team_attributes_data, how=definition.TOKEN_INNER_JOIN,
+                                 left_on=definition.TOKEN_DS_HOME_TEAM_ID,
+                                 right_on=definition.TOKEN_TEAM_ATTR_ID). \
             rename(
-            columns={'buildUpPlaySpeed': 'HomeTeamPlaySpeed', "chanceCreationShooting": "HomeTeamCreatonShooting",
-                     "defencePressure": "HomeTeamDefencePressure"})
-        self._dataset = pd.merge(self._dataset, self._team_attributes_data, how="inner", left_on="AwayTeamAPI",
-                                 right_on="team_api_id"). \
+            columns={definition.TOKEN_TEAM_SPEED: definition.TOKEN_HOME_TEAM_SPEED, definition.TOKEN_TEAM_CHANES: definition.TOKEN_HOME_TEAM_SHOOT,
+                     definition.TOKEN_TEAM_DEF_PRESS: definition.TOKEN_HOME_TEAM_DEF})
+        self._dataset = pd.merge(self._dataset, self._team_attributes_data, how=definition.TOKEN_INNER_JOIN,
+                                 left_on=definition.TOKEN_DS_AWAY_TEAM_ID,
+                                 right_on=definition.TOKEN_TEAM_ATTR_ID). \
             rename(
-            columns={'buildUpPlaySpeed': 'AwayTeamPlaySpeed', "chanceCreationShooting": "AwayTeamCreatonShooting",
-                     "defencePressure": "AwayTeamDefencePressure"})
+            columns={definition.TOKEN_TEAM_SPEED: definition.TOKEN_AWAY_TEAM_SPEED,  definition.TOKEN_TEAM_CHANES: definition.TOKEN_AWAY_TEAM_SHOOT,
+                     definition.TOKEN_TEAM_DEF_PRESS: definition.TOKEN_AWAY_TEAM_DEF})
         self._dataset = self._dataset.drop(columns={'team_api_id_x', 'team_api_id_y'})
 
     def __add_classification(self):
@@ -272,37 +306,65 @@ class FootballPreprocessesor(object):
                 k1 = 2
                 win.append(k1)
 
-        self._dataset['win'] = win
+        self._dataset[definition.TOKEN_CLASS_NAME] = win
 
     def __parse_xml(self):
-        self._match_data[['on_target_shot_home_team', 'on_target_shot_away_team']] = self._match_data[
-            ['shoton', 'home_team_api_id', 'away_team_api_id']].apply(
-            lambda x: self.__calculate_stats_both_teams(x['shoton'], x['home_team_api_id'], x['away_team_api_id']), axis=1,
+        self._match_data[[definition.TOKEN_MATCH_HOME_TEAM_SHOTON, definition.TOKEN_MATCH_AWAY_TEAM_SHOTON]] =\
+            self._match_data[
+            [definition.TOKEN_MATCH_SHOTON, definition.TOKEN_MATCH_HOME_TEAM_ID,
+             definition.TOKEN_MATCH_AWAY_TEAM_ID]].apply(
+            lambda x: self.__calculate_stats_both_teams(x[definition.TOKEN_MATCH_SHOTON],
+                                                        x[definition.TOKEN_MATCH_HOME_TEAM_ID],
+                                                        x[definition.TOKEN_MATCH_AWAY_TEAM_ID]), axis=1,
             result_type="expand")
-        # self.__mean_for_team_for_feat('on_target_shot_home_team', 'home')
 
-        self._match_data[['yellow_card_home_team', 'yellow_card_away_team']] = self._match_data[
-            ['card', 'home_team_api_id', 'away_team_api_id']].apply(
-            lambda x: self.__calculate_stats_both_teams(x['card'], x['home_team_api_id'], x['away_team_api_id']), axis=1,
+        self._match_data[[definition.TOKEN_MATCH_HOME_TEAM_YELLOWCARD, definition.TOKEN_MATCH_AWAY_TEAM_YELLOWCARD]] =\
+            self._match_data[
+            [definition.TOKEN_MATCH_CARD, definition.TOKEN_MATCH_HOME_TEAM_ID,
+             definition.TOKEN_MATCH_AWAY_TEAM_ID]].apply(
+            lambda x: self.__calculate_stats_both_teams(x[definition.TOKEN_MATCH_CARD],
+            x[definition.TOKEN_MATCH_HOME_TEAM_ID],
+            x[definition.TOKEN_MATCH_AWAY_TEAM_ID]), axis=1,
             result_type="expand")
-        self._match_data[['red_card_home_team', 'red_card_away_team']] = self._match_data[['card', 'home_team_api_id', 'away_team_api_id']].apply(
-            lambda x: self.__calculate_stats_both_teams(x['card'], x['home_team_api_id'], x['away_team_api_id'],
-                                                 card_type='r'), axis=1, result_type="expand")
-        self._match_data[['crosses_home_team', 'crosses_away_team']] = self._match_data[['cross', 'home_team_api_id', 'away_team_api_id']].apply(
-            lambda x: self.__calculate_stats_both_teams(x['cross'], x['home_team_api_id'], x['away_team_api_id']), axis=1,
+        self._match_data[[definition.TOKEN_MATCH_HOME_TEAM_REDCARD, definition.TOKEN_MATCH_AWAY_TEAM_REDCARD]] = \
+            self._match_data[[definition.TOKEN_MATCH_CARD, definition.TOKEN_MATCH_HOME_TEAM_ID,
+                              definition.TOKEN_MATCH_AWAY_TEAM_ID]].apply(
+            lambda x: self.__calculate_stats_both_teams(x[definition.TOKEN_MATCH_CARD],
+                x[definition.TOKEN_MATCH_HOME_TEAM_ID], x[
+                definition.TOKEN_MATCH_AWAY_TEAM_ID],
+                                                        card_type='r'), axis=1, result_type="expand")
+
+        self._match_data[[definition.TOKEN_MATCH_HOME_TEAM_CROSSES, definition.TOKEN_MATCH_AWAY_TEAM_CROSSES]] = \
+            self._match_data[[definition.TOKEN_MATCH_CROSS, definition.TOKEN_MATCH_HOME_TEAM_ID,
+         definition.TOKEN_MATCH_AWAY_TEAM_ID]].apply(
+            lambda x: self.__calculate_stats_both_teams(x[definition.TOKEN_MATCH_CROSS],
+        x[definition.TOKEN_MATCH_HOME_TEAM_ID], x[definition.TOKEN_MATCH_AWAY_TEAM_ID]), axis=1,
             result_type="expand")
-        self._match_data[['corner_home_team', 'corner_away_team']] = self._match_data[['corner', 'home_team_api_id', 'away_team_api_id']].apply(
-            lambda x: self.__calculate_stats_both_teams(x['corner'], x['home_team_api_id'], x['away_team_api_id']), axis=1,
+
+        self._match_data[[definition.TOKEN_MATCH_HOME_TEAM_CORNERS, definition.TOKEN_MATCH_AWAY_TEAM_CORNERS]] =\
+            self._match_data[[definition.TOKEN_MATCH_CORNERS,
+           definition.TOKEN_MATCH_HOME_TEAM_ID,
+           definition.TOKEN_MATCH_AWAY_TEAM_ID]].apply(
+            lambda x: self.__calculate_stats_both_teams(x[definition.TOKEN_MATCH_CORNERS],
+            x[definition.TOKEN_MATCH_HOME_TEAM_ID], x[definition.TOKEN_MATCH_AWAY_TEAM_ID]), axis=1,
             result_type="expand")
-        self._match_data[['possession_home_team', 'possession_away_team']] = self._match_data[
-            ['possession', 'home_team_api_id', 'away_team_api_id']].apply(
-            lambda x: self.__calculate_stats_both_teams(x['possession'], x['home_team_api_id'], x['away_team_api_id']), axis=1,
+
+        self._match_data[[definition.TOKEN_MATCH_HOME_TEAM_POSS, definition.TOKEN_MATCH_AWAY_TEAM_POSS]] = self._match_data[
+            [definition.TOKEN_MATCH_POSS, definition.TOKEN_MATCH_HOME_TEAM_ID, definition.TOKEN_MATCH_AWAY_TEAM_ID]].apply(
+            lambda x: self.__calculate_stats_both_teams(x[definition.TOKEN_MATCH_POSS], x[definition.TOKEN_MATCH_HOME_TEAM_ID],
+                                                        x[definition.TOKEN_MATCH_AWAY_TEAM_ID]), axis=1,
             result_type="expand")
 
 
     def __fill_with_mean(self, feature, home_or_away):
-        for team in self._team_attributes_data['team_api_id'].tolist():
-            team_matches = self._match_data.loc[self._match_data[f'{home_or_away}_team_api_id']== team]
+        """
+        The method will calculate the mean of row in the feature given until that row on theat feature
+        :param feature: String. The feature in the df
+        :param home_or_away: String. 'home' or 'away' for indciting if the feature is for the home team or away team
+        :return:
+        """
+        for team in self._team_attributes_data[definition.TOKEN_TEAM_ATTR_ID].tolist():
+            team_matches = self._match_data.loc[self._match_data[f'{home_or_away}_{definition.TOKEN_TEAM_ATTR_ID}']== team]
 
             if team_matches.shape[0] != 0:
                 not_null = team_matches[~team_matches[feature].isna()]
@@ -333,7 +395,7 @@ class FootballPreprocessesor(object):
         stat_away_team = 0
 
         # Dealing with card type using the root element & the card type argument
-        if tree.tag == 'card':
+        if tree.tag == definition.TOKEN_MATCH_CARD:
             for child in tree.iter('value'):
                 # Some xml docs have no card_type element in the tree. comment section seems to have that information
                 try:
@@ -349,7 +411,7 @@ class FootballPreprocessesor(object):
             return stat_home_team, stat_away_team
 
         # Lets take the last possession stat which is available from the xml doc
-        if tree.tag == 'possession':
+        if tree.tag == definition.TOKEN_MATCH_POSS:
             try:
                 last_value = [child for child in tree.iter('value')][-1]
                 return int(last_value.find('homepos').text), int(last_value.find('awaypos').text)
@@ -368,9 +430,11 @@ class FootballPreprocessesor(object):
         new_df = pd.DataFrame()
 
         for label, row in self._dataset.iterrows():
-            away_team ,home_team = row.at['HomeTeamAPI'], row.at['AwayTeamAPI']
+            away_team ,home_team = row.at[definition.TOKEN_DS_HOME_TEAM_ID], row.at[definition.TOKEN_DS_AWAY_TEAM_ID]
             #  Get all the matches of the away_team and the home_team
-            match = self._match_data.loc[(self._match_data['home_team_api_id'] == home_team) & (self._match_data['away_team_api_id'] == away_team)]
+            match = self._match_data.loc[(self._match_data[definition.TOKEN_MATCH_HOME_TEAM_ID] == home_team) &
+                                         (self._match_data[
+            definition.TOKEN_MATCH_AWAY_TEAM_ID] == away_team)]
 
             if match.shape[0] == 0:
                 self.__remove_row(label)
@@ -378,7 +442,7 @@ class FootballPreprocessesor(object):
 
             betting_ods = match.loc[:, self._bets_columns['all'][0]: self._bets_columns['all'][-1]]
 
-            for bet, column in zip(['h', 'a'], ['HomeTeamsOdds', "AwayTeamOdds"]):
+            for bet, column in zip(['h', 'a'], [definition.TOKEN_DS_HOME_TEAM_ODDS, definition.TOKEN_DS_AWAY_TEAM_ODDS]):
 
                 home_or_away_bets_odds = betting_ods.loc[:, self._bets_columns[bet]]
                 #  For each match calculate the mean of all betting ods and that will be the match bet odd.
@@ -386,7 +450,7 @@ class FootballPreprocessesor(object):
 
                 row[column] = betting_odd
 
-            #  Create a new dataframe with the new Odss feature
+            #  Create a new dataframe with the new Odds feature
             new_df = new_df.append(row)
 
         # update the new df
@@ -394,24 +458,24 @@ class FootballPreprocessesor(object):
         self._dataset = new_df
 
     def __add_team_goals_avg(self):
-        home_new_data = {"HomeTeamAPI":[], "HomeTeamAvgGoals": []}
-        away_new_data = {"AwayTeamAPI":[], "AwayTeamAvgGoals": []}
-        for label in self._team_attributes_data['team_api_id'].tolist():
-            home_team_games = self._dataset.loc[(self._dataset['HomeTeamAPI'] == label)]
-            home_team_goals_avg = home_team_games['HomeTeamGoals'].mean()
-            home_new_data['HomeTeamAPI'] += [label]
-            home_new_data['HomeTeamAvgGoals'] += [home_team_goals_avg]
+        home_new_data = {definition.TOKEN_DS_HOME_TEAM_ID:[], definition.TOKEN_DS_HOME_TEAM_AVG_GOALS: []}
+        away_new_data = {definition.TOKEN_DS_AWAY_TEAM_ID:[], definition.TOKEN_DS_AWAY_TEAM_AVG_GOALS: []}
+        for label in self._team_attributes_data[definition.TOKEN_TEAM_ATTR_ID].tolist():
+            home_team_games = self._dataset.loc[(self._dataset[definition.TOKEN_DS_HOME_TEAM_ID] == label)]
+            home_team_goals_avg = home_team_games[definition.TOKEN_DS_HOME_TEAM_GOALS].mean()
+            home_new_data[definition.TOKEN_DS_HOME_TEAM_ID] += [label]
+            home_new_data[definition.TOKEN_DS_HOME_TEAM_AVG_GOALS] += [home_team_goals_avg]
 
-            away_team_games = self._dataset.loc[(self._dataset['AwayTeamAPI'] == label)]
-            away_team_goals_avg = away_team_games['AwayTeamGoals'].mean()
-            away_new_data['AwayTeamAPI'] += [label]
-            away_new_data['AwayTeamAvgGoals'] += [away_team_goals_avg]
+            away_team_games = self._dataset.loc[(self._dataset[definition.TOKEN_DS_AWAY_TEAM_ID] == label)]
+            away_team_goals_avg = away_team_games[definition.TOKEN_DS_AWAY_TEAM_GOALS].mean()
+            away_new_data[definition.TOKEN_DS_AWAY_TEAM_ID] += [label]
+            away_new_data[definition.TOKEN_DS_AWAY_TEAM_AVG_GOALS] += [away_team_goals_avg]
 
         new_home_df = pd.DataFrame(home_new_data)
         new_away_df = pd.DataFrame(away_new_data)
 
-        self._dataset = pd.merge(self._dataset, new_home_df, how="left", on="HomeTeamAPI")
-        self._dataset = pd.merge(self._dataset, new_away_df, how="left", on="AwayTeamAPI")
+        self._dataset = pd.merge(self._dataset, new_home_df, how=definition.TOKEN_LEFT_JOIN, on=definition.TOKEN_DS_HOME_TEAM_ID)
+        self._dataset = pd.merge(self._dataset, new_away_df, how=definition.TOKEN_LEFT_JOIN, on=definition.TOKEN_DS_AWAY_TEAM_ID)
         return
 
     def __add_goals_difference(self):
@@ -422,55 +486,60 @@ class FootballPreprocessesor(object):
         :return:
         """
         copy_df = deepcopy(self._dataset) # Create a copy of the dataset to not change it
-        new_data = {"HomeTeamAPI": [], "AwayTeamAPI":[], "GoalDiff": []}
+        new_data = {definition.TOKEN_DS_HOME_TEAM_ID: [], definition.TOKEN_DS_AWAY_TEAM_ID:[],
+                    definition.TOKEN_DS_GOALDIFF: []}
 
         #  Iterate over the data set until there are no more matches
         while copy_df.shape[0] > 0:
             match = copy_df.iloc[0] # Take the first match each iteration
 
-            away_team, home_team = match.at['HomeTeamAPI'], match.at['AwayTeamAPI']
+            away_team, home_team = match.at[definition.TOKEN_DS_HOME_TEAM_ID], match.at[definition.TOKEN_DS_AWAY_TEAM_ID]
 
             #  Get all the matches of the away_team against the home_team and vice versa
-            matches1 = copy_df.loc[(copy_df['HomeTeamAPI'] == home_team) & (
-                        copy_df['AwayTeamAPI'] == away_team)]
-            matches2 = copy_df.loc[(copy_df['AwayTeamAPI'] == home_team) & (
-                    copy_df['HomeTeamAPI'] == away_team)]
+            matches1 = copy_df.loc[(copy_df[definition.TOKEN_DS_HOME_TEAM_ID] == home_team) & (
+                        copy_df[definition.TOKEN_DS_AWAY_TEAM_ID] == away_team)]
+            matches2 = copy_df.loc[(copy_df[definition.TOKEN_DS_AWAY_TEAM_ID] == home_team) & (
+                    copy_df[definition.TOKEN_DS_HOME_TEAM_ID] == away_team)]
 
-            home_goals = matches1["HomeTeamGoals"].sum()
-            away_goals = matches2["AwayTeamGoals"].sum()
+            home_goals = matches1[definition.TOKEN_DS_HOME_TEAM_GOALS].sum()
+            away_goals = matches2[definition.TOKEN_DS_AWAY_TEAM_GOALS].sum()
 
             total_home_team_goals = home_goals + away_goals
 
-            home_goals = matches2["HomeTeamGoals"].sum()
-            away_goals = matches1["AwayTeamGoals"].sum()
+            home_goals = matches2[definition.TOKEN_DS_HOME_TEAM_GOALS].sum()
+            away_goals = matches1[definition.TOKEN_DS_AWAY_TEAM_GOALS].sum()
 
             total_away_team_goals = home_goals + away_goals
 
             diff = total_home_team_goals - total_away_team_goals
 
-            new_data["HomeTeamAPI"] += [home_team]
-            new_data["AwayTeamAPI"] += [away_team]
-            new_data["GoalDiff"] += [diff]
+            new_data[definition.TOKEN_DS_HOME_TEAM_ID] += [home_team]
+            new_data[definition.TOKEN_DS_AWAY_TEAM_ID] += [away_team]
+            new_data[definition.TOKEN_DS_GOALDIFF] += [diff]
 
-            new_data["HomeTeamAPI"] += [away_team]
-            new_data["AwayTeamAPI"] += [home_team]
-            new_data["GoalDiff"] += [-diff]
+            new_data[definition.TOKEN_DS_HOME_TEAM_ID] += [away_team]
+            new_data[definition.TOKEN_DS_AWAY_TEAM_ID] += [home_team]
+            new_data[definition.TOKEN_DS_GOALDIFF] += [-diff]
 
             #  Delete the matches from the copy df
-            copy_df.drop(list(matches1.index), axis="index", inplace=True)
-            copy_df.drop(list(matches2.index), axis="index", inplace=True)
+            copy_df.drop(list(matches1.index), axis=definition.TOKEN_INDEX_AXIS, inplace=True)
+            copy_df.drop(list(matches2.index), axis=definition.TOKEN_INDEX_AXIS, inplace=True)
 
         new_data_df = pd.DataFrame(new_data)
-        self._dataset = pd.merge(self._dataset, new_data_df, how="inner", on=["HomeTeamAPI","AwayTeamAPI"])
+        self._dataset = pd.merge(self._dataset, new_data_df, how=definition.TOKEN_INNER_JOIN,
+                                 on=[definition.TOKEN_DS_HOME_TEAM_ID,definition.TOKEN_DS_AWAY_TEAM_ID ])
 
     def __remove_row(self, row_index):
             self._dataset = self._dataset[self._dataset.index != row_index]
 
     def __join_match_table(self):
-        to_join = self._match_data.loc[:, 'on_target_shot_home_team': 'possession_away_team']
-        ids = self._match_data.loc[:, 'id']
+        to_join = self._match_data.loc[:, definition.TOKEN_MATCH_HOME_TEAM_SHOTON: definition.TOKEN_MATCH_AWAY_TEAM_POSS]
+        ids = self._match_data.loc[:, definition.TOKEN_MATCH_ID]
         to_join = pd.concat([to_join, ids], axis=1)
-        self._dataset = pd.merge(self._dataset, to_join, how="inner", on="id")
+        self._dataset = pd.merge(self._dataset, to_join, how=definition.TOKEN_INNER_JOIN, on=definition.TOKEN_MATCH_ID)
+
+    def __mean_for_features(self):
+        pass
 
     def __remove_uneeded_features(self):
         self._dataset.drop(columns=[definition.TOKEN_MATCH_ID], inplace=True)
