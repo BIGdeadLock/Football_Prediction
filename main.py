@@ -7,7 +7,7 @@ from sklearn.metrics import precision_score
 from sklearn.metrics import recall_score
 from sklearn.metrics import f1_score
 from sklearn.metrics import jaccard_score
-
+from sklearn.ensemble import RandomForestClassifier
 
 from sklearn.neighbors import KNeighborsClassifier
 
@@ -16,8 +16,6 @@ from sklearn.naive_bayes import GaussianNB
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 
 from sklearn.linear_model import LogisticRegression
-
-from sklearn.ensemble import RandomForestClassifier
 
 from sklearn import preprocessing
 from sklearn.model_selection import cross_validate
@@ -40,18 +38,20 @@ def normalize(df):
     return df2
 
 df2 = pd.read_csv('dataset_no_2015_2016.csv')
-df2 = normalize(df2)
-
 df2test = pd.read_csv("testset.csv")
-df2test = normalize(df2test)
+labels_train = df2.pop("win").tolist()
+labels_test = df2test.pop("win").tolist()
 
-# df2train, df2test= train_test_split(df2, test_size=0.35, random_state=42)
+df2 = normalize(df2)
+df2test = normalize(df2test)
 
 df2=np.array(df2)
 df2test=np.array(df2test)
-Y=df2[:,-1]
+# Y=df2[:,-1]
+Y=np.array(labels_train)
 X=df2[:,0:df2.shape[1]-1]
-Y1=df2test[:,-1]
+# Y1=df2test[:,-1]
+Y1=np.array(labels_test)
 X1=df2test[:,0:df2.shape[1]-1]
 
 
@@ -65,7 +65,7 @@ X1=df2test[:,0:df2.shape[1]-1]
 # print("Accuracy: %.2f%%" % (accuracy * 100.0))
 
 ## KNeighbors Model
-model1 = KNeighborsClassifier(n_neighbors=3)
+model1 = KNeighborsClassifier(n_neighbors=5)
 model1.fit(X,Y)
 score=cross_validate(model1,X,Y,scoring='accuracy')
 print("KNeighbors Cross Validation accuracy %.2f%%" % (np.mean(score['test_score'])*100))
@@ -174,27 +174,27 @@ print("Logistic Regression Model F1: %.2f%%" % (f1 * 100.0))
 print()
 
 # seed = 42
-# #kfold = model_selection.KFold(n_splits=2,shuffle=True, random_state=seed)
-model5=svm.SVC(gamma=0.001,kernel='linear', C=100).fit(X,Y)
-score=cross_validate(model5,X,Y,scoring='accuracy')
-print("SVC Cross Validation accuracy %.2f%%" % (np.mean(score['test_score'])*100))
-score=cross_validate(model5,X,Y,scoring='precision_macro')
-print("SVC Cross Validation precision %.2f%%" % (np.mean(score['test_score'])*100))
-score=cross_validate(model5,X,Y,scoring='recall_macro')
-print("SVC Cross Validation recall %.2f%%" % (np.mean(score['test_score'])*100))
-score=cross_validate(model5,X,Y,scoring='f1_macro')
-print("SVC Cross Validation f1 %.2f%%" % (np.mean(score['test_score'])*100))
-y_pred = model5.predict(X1)
-predictions = [round(value) for value in y_pred]
-# evaluate predictions
-accuracy1 = accuracy_score(Y1, predictions)
-precision1 = precision_score(Y1, predictions, average='macro')
-recall1 = recall_score(Y1, predictions, average='macro')
-f1 = f1_score(Y1,predictions,average='macro')
-print("SVC Model Accuracy: %.2f%%" % (accuracy1 * 100.0))
-print("SVC Model Precision: %.2f%%" % (precision1 * 100.0))
-print("SVC Model Recall: %.2f%%" % (recall1 * 100.0))
-print("SVC Model F1: %.2f%%" % (f1 * 100.0))
+# # #kfold = model_selection.KFold(n_splits=2,shuffle=True, random_state=seed)
+# model5=svm.SVC(gamma=0.001,kernel='linear', C=100).fit(X,Y)
+# score=cross_validate(model5,X,Y,scoring='accuracy')
+# print("SVC Cross Validation accuracy %.2f%%" % (np.mean(score['test_score'])*100))
+# score=cross_validate(model5,X,Y,scoring='precision_macro')
+# print("SVC Cross Validation precision %.2f%%" % (np.mean(score['test_score'])*100))
+# score=cross_validate(model5,X,Y,scoring='recall_macro')
+# print("SVC Cross Validation recall %.2f%%" % (np.mean(score['test_score'])*100))
+# score=cross_validate(model5,X,Y,scoring='f1_macro')
+# print("SVC Cross Validation f1 %.2f%%" % (np.mean(score['test_score'])*100))
+# y_pred = model5.predict(X1)
+# predictions = [round(value) for value in y_pred]
+# # evaluate predictions
+# accuracy1 = accuracy_score(Y1, predictions)
+# precision1 = precision_score(Y1, predictions, average='macro')
+# recall1 = recall_score(Y1, predictions, average='macro')
+# f1 = f1_score(Y1,predictions,average='macro')
+# print("SVC Model Accuracy: %.2f%%" % (accuracy1 * 100.0))
+# print("SVC Model Precision: %.2f%%" % (precision1 * 100.0))
+# print("SVC Model Recall: %.2f%%" % (recall1 * 100.0))
+# print("SVC Model F1: %.2f%%" % (f1 * 100.0))
 
 #Random Forest
 model6 = RandomForestClassifier()
