@@ -174,7 +174,8 @@ class FootballPreprocessesor(object):
         :return:
         """
         for col in [definition.TOKEN_MATCH_HOME_PLAYERS_X_POS, definition.TOKEN_MATCH_HOME_PLAYERS_Y_POS,
-                    definition.TOKEN_MATCH_AWAY_PLAYERS_X_POS, definition.TOKEN_MATCH_AWAY_PLAYERS_Y_POS]:
+                    definition.TOKEN_MATCH_AWAY_PLAYERS_X_POS, definition.TOKEN_MATCH_AWAY_PLAYERS_Y_POS,
+                    definition.TOKEN_MATCH_GOALS]:
             self._match_data.drop(col, axis=1, inplace=True)
 
     def __add_team_rankings(self):
@@ -377,7 +378,7 @@ class FootballPreprocessesor(object):
 
             betting_ods = match.loc[:, self._bets_columns['all'][0]: self._bets_columns['all'][-1]]
 
-            for bet, column in zip(['h', 'a'], ['HomeTeamsOdds', "AwayTeamOdds"]): # TODO: Think if Draw is needed
+            for bet, column in zip(['h', 'a'], ['HomeTeamsOdds', "AwayTeamOdds"]):
 
                 home_or_away_bets_odds = betting_ods.loc[:, self._bets_columns[bet]]
                 #  For each match calculate the mean of all betting ods and that will be the match bet odd.
@@ -472,12 +473,15 @@ class FootballPreprocessesor(object):
         self._dataset = pd.merge(self._dataset, to_join, how="inner", on="id")
 
     def __remove_uneeded_features(self):
-        self._dataset.drop(columns=['id'], inplace=True)
-        self._dataset.drop(columns=['AwayTeam'], inplace=True)
-        self._dataset.drop(columns=['HomeTeam'], inplace=True)
-
+        self._dataset.drop(columns=[definition.TOKEN_MATCH_ID], inplace=True)
+        self._dataset.drop(columns=[definition.TOKEN_DS_HOME_TEAM_NAME], inplace=True)
+        self._dataset.drop(columns=[definition.TOKEN_DS_AWAY_TEAM_NAME], inplace=True)
+        self._dataset.drop(columns=[definition.TOKEN_DS_AWAY_TEAM_ID], inplace=True)
+        self._dataset.drop(columns=[definition.TOKEN_DS_HOME_TEAM_ID], inplace=True)
+        self._dataset.drop(columns=[definition.TOKEN_DS_AWAY_TEAM_GOALS], inplace=True)
+        self._dataset.drop(columns=[definition.TOKEN_DS_HOME_TEAM_GOALS], inplace=True)
 
 
 p = FootballPreprocessesor("database.sqlite")
 data = p.preprocess()
-data.to_csv("dataset_no_2015_2016.csv", index=False)
+data.to_csv("dataset_no_2015_2016_no_draw.csv", index=False)

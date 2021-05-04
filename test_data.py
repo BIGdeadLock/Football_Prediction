@@ -59,14 +59,9 @@ class TestData(object):
         The method will be responsible for deleting unwanted columns (feature) from the match data.
         :return:
         """
-        home_player_X_positions = [f"home_player_X{i}" for i in range(1, 12)]
-        home_player_Y_positions = [f"home_player_Y{i}" for i in range(1, 12)]
-        away_player_X_positions = [f"away_player_X{i}" for i in range(1, 12)]
-        away_player_Y_positions = [f"away_player_Y{i}" for i in range(1, 12)]
-
         # -----Test Data----
-        for col in [home_player_X_positions, home_player_Y_positions, away_player_X_positions,
-                    away_player_Y_positions]:
+        for col in [definition.TOKEN_MATCH_HOME_PLAYERS_X_POS, definition.TOKEN_MATCH_HOME_PLAYERS_Y_POS,
+                    definition.TOKEN_MATCH_AWAY_PLAYERS_X_POS,definition.TOKEN_MATCH_AWAY_PLAYERS_Y_POS]:
             self._match_testdata.drop(col, axis=1, inplace=True)
 
     def __add_team_rankings(self):
@@ -119,8 +114,6 @@ class TestData(object):
 
         self._test_set = pd.merge(self._test_set, home_team_average_players_ratings, how="inner", on="HomeTeamAPI")
         self._test_set = pd.merge(self._test_set, away_team_average_players_ratings, how="inner", on="AwayTeamAPI")
-
-        # ------- Test Data ------------
 
     def __add_team_stats(self):
         """
@@ -368,9 +361,13 @@ class TestData(object):
         self._test_set = pd.merge(self._test_set, to_join, how="inner", on="id")
 
     def __remove_uneeded_features(self):
-        self._test_set.drop(columns=['id'], inplace=True)
-        self._test_set.drop(columns=['AwayTeam'], inplace=True)
-        self._test_set.drop(columns=['HomeTeam'], inplace=True)
+        self._test_set.drop(columns=[definition.TOKEN_MATCH_ID], inplace=True)
+        self._test_set.drop(columns=[definition.TOKEN_DS_HOME_TEAM_NAME], inplace=True)
+        self._test_set.drop(columns=[definition.TOKEN_DS_AWAY_TEAM_NAME], inplace=True)
+        self._test_set.drop(columns=[definition.TOKEN_DS_AWAY_TEAM_ID], inplace=True)
+        self._test_set.drop(columns=[definition.TOKEN_DS_HOME_TEAM_ID], inplace=True)
+        self._test_set.drop(columns=[definition.TOKEN_DS_AWAY_TEAM_GOALS], inplace=True)
+        self._test_set.drop(columns=[definition.TOKEN_DS_HOME_TEAM_GOALS], inplace=True)
 
 
     def get_testdata(self):
@@ -478,4 +475,4 @@ class TestData(object):
 
 t = TestData("database.sqlite")
 data = t.get_testdata()
-data.to_csv("testset.csv", index=False)
+data.to_csv("testset_no_draw.csv", index=False)

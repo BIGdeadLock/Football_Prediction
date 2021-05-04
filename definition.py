@@ -4,6 +4,8 @@ The constants will be added under a variable called token.
 Once a token is changed, it will affect the entre modules that used it.
 """
 
+TOKEN_CLASS_NAME = 'win'
+
 # ----------------- Match Table Tokens --------------------
 TOKEN_MATCH_HOME_TEAM_ID = 'home_team_api_id'
 TOKEN_MATCH_AWAY_TEAM_ID = 'away_team_api_id'
@@ -29,15 +31,20 @@ TOKEN_MATCH_AWAY_PLAYERS_X_POS = [f"away_player_X{i}" for i in range(1,12)]
 TOKEN_MATCH_HOME_PLAYERS_X_POS = [f"home_player_X{i}" for i in range(1,12)]
 TOKEN_MATCH_HOME_PLAYERS_Y_POS = [f"home_player_Y{i}" for i in range(1,12)]
 TOKEN_MATCH_AWAY_PLAYERS_Y_POS = [f"away_player_Y{i}" for i in range(1,12)]
+TOKEN_MATCH_GOALS = ["home_team_goal", "away_team_goal"]
 
 # -------------- Datasets Table Tokens --------------
 TOKEN_DS_HOME_TEAM_ID = "HomeTeamAPI"
 TOKEN_DS_AWAY_TEAM_ID = "AwayTeamAPI"
+TOKEN_DS_AWAY_TEAM_NAME = "AwayTeam"
+TOKEN_DS_HOME_TEAM_NAME = "HomeTeam"
 TOKEN_DS_AWAY_TEAM_GOALS = "AwayTeamGoals"
 TOKEN_DS_HOME_TEAM_GOALS = "HomeTeamGoals"
 TOKEN_DS_HOME_TEAM_Rating = "HomeTeamRatings"
 TOKEN_DS_AWAY_TEAM_Rating = "AwayTeamRatings"
 TOKEN_DS_GOALDIFF = "GoalDiff"
+TOKEN_DS_HOME_TEAM_AVG_GOALS = "HomeTeamAvgGoals"
+TOKEN_DS_AWAY_TEAM_AVG_GOALS = "AwayTeamAvgGoals"
 
 # -------------- DataFrame TOKENS --------------------
 TOKEN_INDEX_AXIS = 'index'
