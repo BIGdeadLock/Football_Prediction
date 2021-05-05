@@ -103,7 +103,7 @@ class TestData(object):
                     players_ratings = self._player_attributes_testset.loc[list(players)]  # Get the team players ratings
                     team_average_players_ratings[team] = players_ratings.mean().at['overall_rating']
                 except KeyError:
-                    continue #TODO: Players from the lineup in the match table are not included in the _player_attributes_testset
+                    continue
 
         home_team_average_players_ratings = pd.DataFrame({"HomeTeamAPI": list(team_average_players_ratings.keys()),
                                                           "HomeTeamRatings": list(
@@ -266,7 +266,7 @@ class TestData(object):
 
             betting_ods = match.loc[:, self._bets_columns['all'][0]: self._bets_columns['all'][-1]]
 
-            for bet, column in zip(['h', 'a'], ['HomeTeamsOdds', "AwayTeamOdds"]):  # TODO: Think if Draw is needed
+            for bet, column in zip(['h', 'a'], ['HomeTeamsOdds', "AwayTeamOdds"]):
 
                 home_or_away_bets_odds = betting_ods.loc[:, self._bets_columns[bet]]
                 #  For each match calculate the mean of all betting ods and that will be the match bet odd.
@@ -376,17 +376,17 @@ class TestData(object):
 
         self.__parse_xml()
         self.__fill_with_mean(definition.TOKEN_MATCH_HOME_TEAM_SHOTON, definition.TOKEN_HOME_TEAM)
-        self.__fill_with_mean(definition.TOKEN_MATCH_AWAY_TEAM_SHOTON, definition.TOKEN_AWAY_TEAM_NAME)
+        self.__fill_with_mean(definition.TOKEN_MATCH_AWAY_TEAM_SHOTON, definition.TOKEN_AWAY_TEAM)
         self.__fill_with_mean(definition.TOKEN_MATCH_HOME_TEAM_YELLOWCARD, definition.TOKEN_HOME_TEAM)
-        self.__fill_with_mean(definition.TOKEN_MATCH_AWAY_TEAM_YELLOWCARD, definition.TOKEN_AWAY_TEAM_NAME)
+        self.__fill_with_mean(definition.TOKEN_MATCH_AWAY_TEAM_YELLOWCARD, definition.TOKEN_AWAY_TEAM)
         self.__fill_with_mean(definition.TOKEN_MATCH_HOME_TEAM_REDCARD, definition.TOKEN_HOME_TEAM)
-        self.__fill_with_mean(definition.TOKEN_MATCH_AWAY_TEAM_REDCARD, definition.TOKEN_AWAY_TEAM_NAME)
+        self.__fill_with_mean(definition.TOKEN_MATCH_AWAY_TEAM_REDCARD, definition.TOKEN_AWAY_TEAM)
         self.__fill_with_mean(definition.TOKEN_MATCH_HOME_TEAM_CROSSES, definition.TOKEN_HOME_TEAM)
-        self.__fill_with_mean(definition.TOKEN_MATCH_AWAY_TEAM_CROSSES, definition.TOKEN_AWAY_TEAM_NAME)
+        self.__fill_with_mean(definition.TOKEN_MATCH_AWAY_TEAM_CROSSES, definition.TOKEN_AWAY_TEAM)
         self.__fill_with_mean(definition.TOKEN_MATCH_HOME_TEAM_CORNERS, definition.TOKEN_HOME_TEAM)
-        self.__fill_with_mean(definition.TOKEN_MATCH_AWAY_TEAM_CORNERS, definition.TOKEN_AWAY_TEAM_NAME)
+        self.__fill_with_mean(definition.TOKEN_MATCH_AWAY_TEAM_CORNERS, definition.TOKEN_AWAY_TEAM)
         self.__fill_with_mean(definition.TOKEN_MATCH_HOME_TEAM_POSS, definition.TOKEN_HOME_TEAM)
-        self.__fill_with_mean(definition.TOKEN_MATCH_AWAY_TEAM_POSS, definition.TOKEN_AWAY_TEAM_NAME)
+        self.__fill_with_mean(definition.TOKEN_MATCH_AWAY_TEAM_POSS, definition.TOKEN_AWAY_TEAM)
         self.__join_match_table()
         self.__add_team_stats()
         self.__add_team_goals_avg()
@@ -430,18 +430,22 @@ class TestData(object):
              "AwayTeamGoals": data1.away_team_goal})
 
     def __load_player_attr_table(self):
-        self._player_attributes_testset = pd.read_sql_query("""SELECT DISTINCT player_api_id, overall_rating 
+        self._player_attributes_testset = pd.read_sql_query("""SELECT player_api_id,  avg(overall_rating) as overall_rating  
                                                             FROM Player_Attributes
                                                             WHERE strftime('%Y',date)='2015' or strftime('%Y',date)='2016'
-
+                                                            GROUP BY player_api_id
                                                             """, self._database_connection)
         # set the index to be the player_api_id field
         self._player_attributes_testset.set_index('player_api_id', inplace=True, drop=True)
 
     def __load_team_attr_table(self):
-        self._team_attributes_testdata = pd.read_sql("""SELECT team_api_id, buildUpPlaySpeed, chanceCreationShooting, defencePressure  
+        self._team_attributes_testdata = pd.read_sql("""SELECT team_api_id, 
+                                                avg(buildUpPlaySpeed) as buildUpPlaySpeed,
+                                                avg(chanceCreationShooting) as chanceCreationShooting, 
+                                                avg(defencePressure) as defencePressure 
                                                     FROM Team_Attributes
                                                     WHERE strftime('%Y',date)='2015' or strftime('%Y',date)='2016'
+                                                    GROUP BY team_api_id
                                                     """, self._database_connection)
 
     def __load_match_table(self):
@@ -475,4 +479,4 @@ class TestData(object):
 
 t = TestData("database.sqlite")
 data = t.get_testdata()
-data.to_csv("testset_no_draw.csv", index=False)
+data.to_csv("testset.csv", index=False)

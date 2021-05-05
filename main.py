@@ -42,20 +42,12 @@ def normalize(df) -> pd.DataFrame:
 
     return df2
 
-df2 = pd.read_csv('new_data\\traindata.csv')
-df2test = pd.read_csv("new_data\\testset.csv")
+df2 = pd.read_csv('dataset\\new_train.csv')
+df2test = pd.read_csv("dataset\\new_testset.csv")
 
 labels_train, df2 = seperate_labels_from_data(df2)
 labels_test, df2test = seperate_labels_from_data(df2test)
 
-# df2 = remove_features(df2, definition.TOKEN_DS_GOALDIFF)
-# df2test = remove_features(df2test, definition.TOKEN_DS_GOALDIFF)
-
-# df2 = remove_features(df2, definition.TOKEN_DS_AWAY_TEAM_AVG_GOALS)
-# df2test = remove_features(df2test, definition.TOKEN_DS_AWAY_TEAM_AVG_GOALS)
-#
-# df2 = remove_features(df2, definition.TOKEN_DS_HOME_TEAM_AVG_GOALS)
-# df2test = remove_features(df2test, definition.TOKEN_DS_HOME_TEAM_AVG_GOALS)
 
 print(df2.columns.tolist())
 df2 = normalize(df2)
@@ -71,7 +63,7 @@ Y1=np.array(labels_test)
 X1=df2test[:,0:df2.shape[1]-1]
 
 
-
+#  Feature Selection - Show the each feature
 ridge = Ridge(alpha=1.0)
 ridge.fit(X,Y)
 # A helper method for pretty-printing the coefficients
