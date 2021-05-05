@@ -504,9 +504,18 @@ class FootballPreprocessesor(object):
                                  on=[definition.TOKEN_DS_HOME_TEAM_ID,definition.TOKEN_DS_AWAY_TEAM_ID ])
 
     def __remove_row(self, row_index):
-            self._dataset = self._dataset[self._dataset.index != row_index]
+        """
+        The method will delete the row from the dataset
+        :param row_index: int. The index of the row in the dataframe
+        :return:
+        """
+        self._dataset = self._dataset[self._dataset.index != row_index]
 
     def __join_match_table(self):
+        """
+        The method will Join the two tables based on selected features
+        :return:
+        """
         to_join = self._match_data.loc[:, definition.TOKEN_MATCH_HOME_TEAM_SHOTON: definition.TOKEN_MATCH_AWAY_TEAM_POSS]
         ids = self._match_data.loc[:, definition.TOKEN_MATCH_ID]
         to_join = pd.concat([to_join, ids], axis=1)
@@ -516,6 +525,10 @@ class FootballPreprocessesor(object):
         pass
 
     def __remove_uneeded_features(self):
+        """
+        The method will be responsible for dropping features that are not important for the predictions
+        :return:
+        """
         self._dataset.drop(columns=[definition.TOKEN_MATCH_ID], inplace=True)
         self._dataset.drop(columns=[definition.TOKEN_DS_HOME_TEAM_NAME], inplace=True)
         self._dataset.drop(columns=[definition.TOKEN_DS_AWAY_TEAM_NAME], inplace=True)
