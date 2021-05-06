@@ -32,6 +32,7 @@ class FootballPreprocessesor(object):
                     definition.TOKEN_MATCH_AWAY_PLAYERS_X_POS, definition.TOKEN_MATCH_AWAY_PLAYERS_Y_POS,
                     definition.TOKEN_MATCH_GOALS]
         for i, data in enumerate(self._matches_data):
+            # The data var will point the data that is being preprocessed
             data = self.__clear_null_from_match(data)
             data = dimentions_reduction(data, features)
             data = self.__parse_xml(data)
