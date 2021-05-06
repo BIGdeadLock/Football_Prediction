@@ -66,7 +66,7 @@ class TestData(object):
 
     def __add_team_rankings(self):
         """
-        The method will be responsible for creating the Team Rankings features in the dataset.
+        The method will be responsible for creating the Team Rankings features in the Data.
         The team rankings features include the HomeTeamRanking and AwayTeamRanking which are based on the
         overall_rating of the players in each team's lineup.
 
@@ -117,7 +117,7 @@ class TestData(object):
 
     def __add_team_stats(self):
         """
-        The method will be responsible for creating the Team stats features in the dataset.
+        The method will be responsible for creating the Team stats features in the Data.
         The team stats features include the buildUpPlaySpeed, chanceCreationShooting and defencePressure of each team
         in each match.
 
@@ -309,7 +309,7 @@ class TestData(object):
         calculation.
         :return:
         """
-        copy_df = deepcopy(self._test_set)  # Create a copy of the dataset to not change it
+        copy_df = deepcopy(self._test_set)  # Create a copy of the Data to not change it
         new_data = {"HomeTeamAPI": [], "AwayTeamAPI": [], "GoalDiff": []}
 
         #  Iterate over the data set until there are no more matches

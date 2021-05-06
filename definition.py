@@ -73,6 +73,7 @@ TOKEN_INNER_JOIN = 'inner'
 
 # -------------- Player_Attributes Table Tokens --------------
 TOKEN_PLAYER_ATTRIB_OVERALL = 'overall_rating'
+TOKEN_PLAYER_ID = 'player_api_id'
 
 # -------------- Team_Attributes Table Tokens ---------------
 TOKEN_TEAM_ATTR_ID = 'team_api_id'
