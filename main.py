@@ -1,29 +1,17 @@
 import definition
 import numpy as np
 import pandas as pd
-
 from sklearn.metrics import accuracy_score
 from sklearn.metrics import precision_score
 from sklearn.metrics import recall_score
 from sklearn.metrics import f1_score
 from sklearn.metrics import jaccard_score
 from sklearn.ensemble import RandomForestClassifier
-
 from sklearn.neighbors import KNeighborsClassifier
-
 from sklearn.naive_bayes import GaussianNB
-
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
-
-from sklearn.linear_model import LogisticRegression
-
 from sklearn import preprocessing
-from sklearn.feature_selection import SelectKBest
-from sklearn.feature_selection import chi2
 from sklearn.model_selection import cross_validate
-from sklearn import svm
-from sklearn.linear_model import Ridge
-from sklearn.feature_selection import RFE
 from preprocess import FootballPreprocessesor
 from dataset import Dataset
 
